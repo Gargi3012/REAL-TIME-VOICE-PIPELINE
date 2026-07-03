@@ -13,7 +13,7 @@ Each milestone is logged with date, scope, decisions, and outcomes.
 
 ## Project Progress Summary
 
-> **Last Updated**: 2026-07-02 18:26 IST
+> **Last Updated**: 2026-07-03 23:26 IST
 
 ### Milestones
 
@@ -43,11 +43,11 @@ Each milestone is logged with date, scope, decisions, and outcomes.
 
 | Commit | Message | Files |
 |---|---|---|
-| `pending` | feat: event bus implementation | 16 changed |
-| `90f4b6b` | docs: add project progress summary | 1 changed |
+| `09f8b46` | feat: pipeline runner execution engine | 21 changed |
+| `4f34101` | feat: pipeline builder — immutable DAG orchestrator | 18 changed |
+| `c3918c0` | feat: event bus implementation | 16 changed |
 | `0772b50` | feat: conversation state machine | 12 changed |
 | `1a465e5` | feat: session management layer + audit suite | 20 changed |
-| `1900fc7` | first commit | — |
 
 **Branch**: `feature/session-management` → `origin/feature/session-management`
 
