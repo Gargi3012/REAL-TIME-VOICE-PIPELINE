@@ -611,6 +611,37 @@ git diff --name-only HEAD:
 
 ---
 
+## Milestone 11 — Pillar 2 Test Coverage & Stabilization
+
+**Date**: 2026-07-04  
+**Status**: ✅ Complete  
+**Scope**: `tests/test_pipecat_processors.py`, `tests/test_pipecat_transport.py`, `app/conversation/events.py`, `cybernauts-pillar2/`
+
+### What Was Built
+This milestone stabilizes the Pillar 2 integration by resolving pre-existing core bugs and ensuring test coverage for the newly added Pipecat adapter layer.
+
+| File | Change Type | Purpose |
+|---|---|---|
+| `app/conversation/events.py` | Bug Fix | Resolved Python 3.13 `super()` failure in `frozen=True, slots=True` dataclass by using explicit `ConversationEvent.to_dict(self)` call. |
+| `tests/test_pipecat_processors.py` | New Tests | Unit tests for STT, LLM, TTS Pipecat processor factory, including fallback handling when `pipecat-ai` is absent. |
+| `tests/test_pipecat_transport.py` | New Tests | Unit tests for `DailyTransportAdapter` and mock WebSocket/WebRTC components. |
+| `cybernauts-pillar2/` | Tracked | Tracked the Pillar 2 development sandbox and manual mic-testing scripts (`test_mic_stt.py`) for future reference. |
+
+### Key Design Decisions
+1. **Mocking Pipecat in CI**: The new tests use `sys.modules` patching and standard mocking to completely isolate the test environment from `pipecat-ai` and `sounddevice` requirements, ensuring tests pass seamlessly everywhere.
+2. **Explicit Superclass Delegation**: Overcame the Python 3.13 slotted dataclass `super()` regression by hard-binding the parent class method, keeping our data structures immutable and fast without sacrificing JSON serialization.
+
+### Test Results
+
+| Metric | Before (Milestone 10) | After (Milestone 11) |
+|---|---|---|
+| Tests collected | 413 | 422 |
+| Tests passing | 412 | 422 |
+| Tests failing | 1 (Python 3.13 bug) | 0 |
+| New failures introduced | — | 0 |
+
+---
+
 <!-- 
 TEMPLATE FOR FUTURE ENTRIES — copy and fill in below this line:
 

@@ -1,0 +1,6 @@
+pipecat-ai[daily,deepgram,elevenlabs,groq]
+python-dotenv
+aiohttp
+deepgram-sdk 
+
+

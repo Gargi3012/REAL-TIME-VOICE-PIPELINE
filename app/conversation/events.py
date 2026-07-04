@@ -116,7 +116,7 @@ class ErrorOccurred(ConversationEvent):
     error_message: str = "Unknown error"
 
     def to_dict(self) -> dict[str, str]:
-        d = super().to_dict()
+        d = ConversationEvent.to_dict(self)
         d["error_message"] = self.error_message
         return d
 
