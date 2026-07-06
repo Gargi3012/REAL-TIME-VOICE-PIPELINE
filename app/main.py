@@ -56,7 +56,7 @@ async def run_voice_session() -> None:
     # ── 3. Conversation FSM ─────────────────────────────────────────────
     fsm = ConversationStateMachine(session_id=session_id)
     # Transition from IDLE → LISTENING (pipeline is about to start)
-    fsm.transition_to(ConversationState.IDLE, reason="session initialized")
+    fsm.transition_to(ConversationState.LISTENING, reason="session initialized")
 
     # ── 4. Pipeline DAG ─────────────────────────────────────────────────
     pipeline_builder = PipelineFactory.create_voice_pipeline(
