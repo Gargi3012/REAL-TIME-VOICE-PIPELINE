@@ -63,6 +63,7 @@ def build_tts_service(metadata: Optional[dict[str, Any]] = None) -> Any:
     stability = metadata.get("stability", DEFAULT_STABILITY)
     similarity_boost = metadata.get("similarity_boost", DEFAULT_SIMILARITY_BOOST)
 
+    assert ELEVEN_LABS_API_KEY is not None
     tts = ElevenLabsTTSService(
         api_key=ELEVEN_LABS_API_KEY,
         voice_id=voice_id,
