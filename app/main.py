@@ -137,17 +137,10 @@ async def run_voice_session(transport=None) -> None:
                 room_url=LIVEKIT_URL,
                 bot_name=BOT_NAME,
             )
-            transport.register_events()
+            # LiveKitTransport does not have a register_events method to call here
             logger.info("LiveKitTransportAdapter ready | room={r}", r=LIVEKIT_URL)
         else:
-            # Default to Daily mode
-            from app.adapters.pipecat.transport import DailyTransportAdapter
-            transport = DailyTransportAdapter(
-                room_url=DAILY_ROOM_URL,
-                bot_name=BOT_NAME,
-            )
-            transport.register_events()
-            logger.info("DailyTransportAdapter ready | room={r}", r=DAILY_ROOM_URL)
+            raise ValueError(f"TRANSPORT_MODE '{TRANSPORT_MODE}' is invalid. Supported: 'twilio', 'livekit'.")
     else:
         logger.info("TwilioTransportAdapter injected via WebSocket.")
 

@@ -41,6 +41,6 @@ ELEVEN_LABS_VOICE_ID: str = os.getenv("ELEVEN_LABS_VOICE_ID", "21m00TlvDq8ikWAM"
 BOT_NAME: str = os.getenv("BOT_NAME", "Cybernauts Agent")
 
 # ── Transport (Telephony/WebRTC transport) ────────────────────────────────
-TRANSPORT_MODE: str = os.getenv("TRANSPORT_MODE", "daily") # "daily", "twilio", or "livekit"
+TRANSPORT_MODE: str = os.getenv("TRANSPORT_MODE", "livekit") # "twilio", or "livekit"
 TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
