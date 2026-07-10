@@ -78,9 +78,10 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
 
         stt = DeepgramSTTService(
             api_key=DEEPGRAM_API_KEY,
+            sample_rate=8000,
             settings=DeepgramSTTService.Settings(
                 model=metadata.get("model", "nova-2"),
-                language=metadata.get("language", "en-US"),
+                language=metadata.get("language", "hi"),
                 smart_format=metadata.get("smart_format", True),
                 interim_results=metadata.get("interim_results", True),
                 endpointing=metadata.get("endpointing", 300),
@@ -98,7 +99,9 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
         model = metadata.get("model", GROQ_MODEL)
         llm = GroqLLMService(
             api_key=GROQ_API_KEY,
-            model=model,
+            settings=GroqLLMService.Settings(
+                model=model,
+            )
         )
         logger.info("GroqLLMService created | model={m}", m=model)
         return llm
@@ -112,7 +115,9 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
         voice_id = metadata.get("voice_id", ELEVEN_LABS_VOICE_ID)
         tts = ElevenLabsTTSService(
             api_key=ELEVEN_LABS_API_KEY,
-            voice_id=voice_id,
+            settings=ElevenLabsTTSService.Settings(
+                voice=voice_id,
+            )
         )
         logger.info("ElevenLabsTTSService created | voice_id={v}", v=voice_id)
         return tts

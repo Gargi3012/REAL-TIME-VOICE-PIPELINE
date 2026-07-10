@@ -16,7 +16,6 @@ from .lifecycle import PipecatLifecycleManager
 from .mapper import PipecatPipelineMapper
 from .processors import PipecatProcessorAdapter
 from .transport import (
-    DailyTransportAdapter,
     LiveKitTransportAdapter,
     MockWebRTCTransport,
     MockWebSocketTransport,
@@ -33,7 +32,6 @@ __all__ = [
     "PipecatPipelineMapper",
     "PipecatProcessorAdapter",
     "PipecatTransportAdapter",
-    "DailyTransportAdapter",
     "LiveKitTransportAdapter",
     "TwilioTransportAdapter",
     "MockWebSocketTransport",

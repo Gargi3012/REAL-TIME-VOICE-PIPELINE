@@ -277,7 +277,10 @@ class PipecatAdapter:
                 execution_id=self.execution_id,
             ).info("Running Pipecat adapter")
             
+            await self.lifecycle.start()
+            
             import os
+            import asyncio
             if os.getenv("ENABLE_INITIAL_GREETING", "True").lower() == "true":
                 from pipecat.frames.frames import LLMMessagesAppendFrame
                 from app.events.event_types import AssistantGreetingStarted
@@ -288,17 +291,17 @@ class PipecatAdapter:
                     AssistantGreetingStarted(session_id=self.session_id)
                 )
 
+                # Delay greeting to allow Twilio audio to fully connect
+                await asyncio.sleep(2.0)
                 await self.task.queue_frames([
                     LLMMessagesAppendFrame(
                         messages=[{
                             "role": "system",
-                            "content": "A new phone conversation has just started. Generate a short, friendly greeting. Maximum: two short sentences. Invite the caller to speak. Do not introduce yourself repeatedly. Do not mention you are an AI unless asked."
+                            "content": "A new phone conversation has just started. You are Sarah from Cybernauts Noida. Say exactly: 'Hello, I'm Sarah from Cybernauts Noida. How can I assist you?'"
                         }],
                         run_llm=True
                     )
                 ])
-
-            await self.lifecycle.start()
 
             # For the mock task: manually simulate processor events
             if isinstance(self.task, MockPipecatPipelineTask):
