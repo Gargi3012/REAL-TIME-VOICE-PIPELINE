@@ -25,7 +25,8 @@ from .exceptions import PipecatAdapterError
 from .lifecycle import PipecatLifecycleManager
 from .mapper import PipecatPipelineMapper
 from .transport import PipecatTransportAdapter
-from app.llm.prompts import VOICE_SYSTEM_PROMPT
+from app.llm.prompts import VOICE_SYSTEM_PROMPT 
+from app.llm.company_faq import get_faq_context_block
 
 
 # ── Fallback mock (kept for test compatibility) ───────────────────────
@@ -102,7 +103,7 @@ def _build_real_pipeline_task(
 
         context = LLMContext(
               messages=[
-                  {"role": "system", "content": VOICE_SYSTEM_PROMPT}
+                 {"role": "system", "content": VOICE_SYSTEM_PROMPT + "\n\n" + get_faq_context_block()}
                ]
             )
         
