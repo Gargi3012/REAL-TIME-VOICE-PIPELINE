@@ -16,3 +16,4 @@ deepgram-sdk>=3.0.0
 groq>=0.9.0
 livekit-api>=0.4.0
 certifi>=2023.0.0
+pytest==9.1.1
