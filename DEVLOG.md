@@ -1634,3 +1634,24 @@ Pillar 2 (The Real-Time Transport and Audio Services Layer) has been completely 
 
 ### Conclusion
 The Pillar 1 backend orchestration seamlessly integrates with the Pillar 2 external AI services and real-world telephony transport. E2E execution is flawlessly functional with natural conversational flow and barge-in capability.
+
+
+---
+## Milestone — Pillar 3 (AI Services): Company FAQ Knowledge Base Integration
+**Date**: 2026-07-11
+**Pillar**: Pillar 3 (Groq LLM + Context Layer)
+**Author**: Aastha Sehgal
+**Status**: ✅ Complete
+
+### Overview
+As part of Pillar 3 (Groq LLM + Context Layer) ownership, added a company-specific FAQ knowledge base (`app/llm/knowledge_base.json` + `app/llm/company_faq.py`) so the voice agent can answer common customer questions about Cybernauts (services, contact info, company background) using verified information instead of relying on the LLM's general knowledge.
+
+### What was built
+1. **`knowledge_base.json`** — Structured Q&A pairs across three categories: About the Company, Services, and General Support, sourced from Cybernauts' official website and LinkedIn.
+2. **`company_faq.py`** — Loader module exposing `get_faq_context_block()`, which formats the FAQ data into a text block for injection into the LLM system prompt.
+3. **Pipeline wiring** — `app/adapters/pipecat/adapter.py` now appends `get_faq_context_block()` to `VOICE_SYSTEM_PROMPT` before it's sent to the LLM, so every call has company context available.
+4. **Fallback behavior** — If a caller asks something outside the FAQ (e.g. pricing, contracts), the agent is instructed to avoid guessing and instead point the caller to the team directly (WhatsApp/email), rather than fabricating an answer.
+5. **Unit tests** (`tests/test_company_faq.py`) — 5 tests verifying JSON structure, expected categories, and correct context-block generation. All passing.
+
+### Conclusion
+This extends Pillar 3's existing Groq LLM + Context layer work with company-specific knowledge, fully wired into the live prompt-building path and independently testable. Decoupled from the in-progress Postgres/session_id memory work — no shared code or dependencies between the two efforts.
