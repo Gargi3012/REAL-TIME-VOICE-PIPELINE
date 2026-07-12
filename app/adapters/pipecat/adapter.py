@@ -13,6 +13,7 @@ In test environments (pipecat-ai not installed):
 """
 
 import asyncio
+import os
 import time
 from typing import Any, List, Optional
 
@@ -25,7 +26,7 @@ from .exceptions import PipecatAdapterError
 from .lifecycle import PipecatLifecycleManager
 from .mapper import PipecatPipelineMapper
 from .transport import PipecatTransportAdapter
-from app.llm.prompts import VOICE_SYSTEM_PROMPT 
+from app.llm.prompts import VOICE_SYSTEM_PROMPT
 from app.llm.company_faq import get_faq_context_block
 
 
@@ -61,7 +62,7 @@ def _build_real_pipeline_task(
     transport: Optional[PipecatTransportAdapter],
     bridge: PipecatEventBridge,
 ) -> Any:
-    """Build an actual pipecat.pipeline.task.PipelineTask.
+    """Build an actual pipecat.pipeline.task.PipelineTask directly from mapped processors.
 
     Injects transport.input() at the start and transport.output() at the
     end of the processor list, then wires frame-level callbacks from the
@@ -69,137 +70,158 @@ def _build_real_pipeline_task(
 
     Raises ImportError if pipecat-ai is not installed.
     """
-    from pipecat.pipeline.pipeline import Pipeline as PipecatPipeline
-    from pipecat.pipeline.task import PipelineTask
-    from pipecat.frames.frames import TranscriptionFrame, LLMFullResponseEndFrame, TTSStartedFrame, TTSStoppedFrame, UserStartedSpeakingFrame
-
-    processors: List[Any] = []
-
-    # 1. Transport input (mic audio) at the front
-    if transport is not None:
-        real_transport = transport.get_pipecat_transport()
-        processors.append(real_transport.input())
-        
-        # In Pipecat 1.5.0, VAD is a separate processor that must be injected manually
-        from pipecat.processors.audio.vad_processor import VADProcessor
-        from pipecat.audio.vad.silero import SileroVADAnalyzer
-        processors.append(VADProcessor(vad_analyzer=SileroVADAnalyzer()))
-
-    # 2. Core processors (STT → LLM → TTS) from the mapper
-    # We must wire up the OpenAILLMContext and aggregator for the LLM
-    from pipecat.services.groq.llm import GroqLLMService
-    from pipecat.pipeline.pipeline import Pipeline as PipecatPipeline
-    
-    # We need to find the LLM to attach the aggregator
-    llm = next((p for p in pipecat_processors if isinstance(p, GroqLLMService)), None)
-    
-    if llm:
-        from pipecat.processors.aggregators.llm_context import LLMContext
-        from pipecat.processors.aggregators.llm_response_universal import LLMUserAggregator, LLMAssistantAggregator
-        
-        from pipecat.turns.user_turn_strategies import UserTurnStrategies
-        from pipecat.turns.user_stop.speech_timeout_user_turn_stop_strategy import SpeechTimeoutUserTurnStopStrategy
-        from pipecat.processors.aggregators.llm_response_universal import LLMUserAggregatorParams
-
-        session_id = bridge.session_id
-        from app.session.manager import SessionManager
-        sm = SessionManager()
-        sess = sm.get_session(session_id)
-        prev_summary = sess.metadata.get("previous_summary", "") if sess else ""
-        
-        system_content = VOICE_SYSTEM_PROMPT + "\n\n" + get_faq_context_block()
-        if prev_summary:
-            system_content += "\n\nPrevious Conversation Summary for this caller:\n" + prev_summary
-
-        context = LLMContext(
-              messages=[
-                 {"role": "system", "content": system_content}
-               ]
-            )
-        
-        # Optimize Turn Stop Strategy for extreme low latency (bypasses LLM completeness checks)
-        from pipecat.turns.user_mute.mute_until_first_bot_complete_user_mute_strategy import MuteUntilFirstBotCompleteUserMuteStrategy
-        import os
-        
-        mute_strategies = []
-        if os.getenv("ENABLE_INITIAL_GREETING", "True").lower() == "true":
-            mute_strategies.append(MuteUntilFirstBotCompleteUserMuteStrategy())
-            
-        agg_params = LLMUserAggregatorParams(
-            user_turn_strategies=UserTurnStrategies(
-                stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.6)]
-            ),
-            user_mute_strategies=mute_strategies
-        )
-        user_agg = LLMUserAggregator(context, params=agg_params)
-        asst_agg = LLMAssistantAggregator(context)
-        
-        # Build the exact Pipecat sequence: [stt, user_agg, llm, tts, asst_agg]
-        new_processors = []
-        for p in pipecat_processors:
-            if isinstance(p, GroqLLMService):
-                new_processors.append(user_agg)
-                new_processors.append(p)
-            elif p.__class__.__name__.endswith("TTSService"):
-                new_processors.append(p)
-                new_processors.append(asst_agg)
-            else:
-                new_processors.append(p)
-                
-        processors.extend(new_processors)
-    else:
-        processors.extend(pipecat_processors)
-
-    # 3. Transport output (speaker) at the back
-    if transport is not None:
-        real_transport = transport.get_pipecat_transport()
-        processors.append(real_transport.output())
-
-    real_pipeline = PipecatPipeline(processors)
+    from pipecat.pipeline.pipeline import Pipeline
+    from pipecat.pipeline.task import PipelineParams, PipelineTask
+    from pipecat.processors.aggregators.llm_context import LLMContext
+    from pipecat.processors.aggregators.llm_response_universal import (
+        LLMUserAggregator,
+        LLMAssistantAggregator,
+    )
     from pipecat.observers.base_observer import BaseObserver, FramePushed
+    import time
 
+    # 1. Prepare context for Pillar 3 FAQ & Caller Persistence
+    session_id = bridge.session_id
+    from app.session.manager import SessionManager
+    sm = SessionManager()
+    sess = sm.get_session(session_id)
+    prev_summary = sess.metadata.get("previous_summary", "") if sess else ""
+
+    company_context = get_faq_context_block()
+    if prev_summary:
+        company_context += "\n\nPrevious Conversation Summary for this caller:\n" + prev_summary
+
+    prompt = VOICE_SYSTEM_PROMPT
+    if company_context:
+        prompt += f"\n\nCompany Context:\n{company_context}"
+    context = LLMContext([{"role": "system", "content": prompt}])
+
+    # 2. Extract real transport
+    real_transport = transport.get_pipecat_transport() if transport else None
+
+    # 3. Create EventBridgeObserver to connect Pipecat to EventBus (Pillar 1)
     class EventBridgeObserver(BaseObserver):
         async def on_push_frame(self, data: FramePushed):
             from app.main import global_timers
             frame = data.frame
             now = time.perf_counter()
             from pipecat.frames.frames import (
-                TranscriptionFrame, LLMFullResponseStartFrame, LLMFullResponseEndFrame, 
+                TranscriptionFrame, LLMFullResponseStartFrame, LLMFullResponseEndFrame,
                 TTSStartedFrame, TTSStoppedFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame
             )
-            
+
             if isinstance(frame, UserStartedSpeakingFrame):
                 if "vad_user_started" not in global_timers:
                     global_timers["vad_user_started"] = now
                 bridge.on_user_interrupted()
-                
+
             elif isinstance(frame, UserStoppedSpeakingFrame):
                 global_timers["vad_user_stopped"] = now
-                
-            elif isinstance(frame, TranscriptionFrame) and frame.text:
+
+            elif isinstance(frame, TranscriptionFrame) and getattr(frame, "text", ""):
                 if "stt_first_transcript" not in global_timers:
                     global_timers["stt_first_transcript"] = now
                 bridge.on_transcript_ready(frame.text)
-                
+
             elif isinstance(frame, LLMFullResponseStartFrame):
                 if "llm_first_token" not in global_timers:
                     global_timers["llm_first_token"] = now
                 bridge.on_llm_response_started()
-                    
+
             elif isinstance(frame, LLMFullResponseEndFrame):
                 global_timers["llm_complete"] = now
                 bridge.on_llm_response_ready(getattr(frame, "text", ""))
-                
+
             elif isinstance(frame, TTSStartedFrame):
                 bridge.on_audio_started()
-                
+
             elif isinstance(frame, TTSStoppedFrame):
                 bridge.on_audio_finished()
 
-    task = PipelineTask(real_pipeline, observers=[EventBridgeObserver()])
+    # 4. Build task using mapped processors — use endswith() to avoid
+    #    substring collision (e.g. "STT" is a substring of "STTService" and
+    #    "TTSService" — naive "TTS" in name would match "DeepgramSTTService").
+    stt = next(
+        (p for p in pipecat_processors
+         if type(p).__name__.endswith("STTService") or type(p).__name__ == "MockSTT"),
+        None,
+    )
+    llm = next(
+        (p for p in pipecat_processors
+         if type(p).__name__.endswith("LLMService") or type(p).__name__ == "MockLLM"),
+        None,
+    )
+    tts = next(
+        (p for p in pipecat_processors
+         if type(p).__name__.endswith("TTSService") or type(p).__name__ == "MockTTS"),
+        None,
+    )
+
+    if not (stt and llm and tts):
+        raise ValueError(f"Pipeline is missing processors. STT={stt}, LLM={llm}, TTS={tts}")
+
+    logger.debug(f"Pipeline elements: STT={type(stt).__name__}, LLM={type(llm).__name__}, TTS={type(tts).__name__}")
+
+    # Optimize Turn Stop Strategy for extreme low latency (bypasses LLM completeness checks)
+    from pipecat.turns.user_turn_strategies import UserTurnStrategies
+    from pipecat.turns.user_stop.speech_timeout_user_turn_stop_strategy import SpeechTimeoutUserTurnStopStrategy
+    from pipecat.processors.aggregators.llm_response_universal import LLMUserAggregatorParams
+    from pipecat.turns.user_mute.mute_until_first_bot_complete_user_mute_strategy import MuteUntilFirstBotCompleteUserMuteStrategy
+    import os
+
+    mute_strategies = []
+    if os.getenv("ENABLE_INITIAL_GREETING", "True").lower() == "true":
+        mute_strategies.append(MuteUntilFirstBotCompleteUserMuteStrategy())
+        
+    agg_params = LLMUserAggregatorParams(
+        user_turn_strategies=UserTurnStrategies(
+            stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.6)]
+        ),
+        user_mute_strategies=mute_strategies
+    )
+
+    # Pipecat 1.5.0: create_context_aggregator() was removed from LLM services.
+    # Directly instantiate the user/assistant aggregators paired together.
+    user_aggregator = LLMUserAggregator(context=context, params=agg_params)
+    assistant_aggregator = LLMAssistantAggregator(
+        context=context,
+        _paired_user_aggregator=user_aggregator,
+    )
+
+    # In Pipecat 1.5.0, VAD is a separate processor that must be injected manually
+    from pipecat.processors.audio.vad_processor import VADProcessor
+    from pipecat.audio.vad.silero import SileroVADAnalyzer
+
+    # Canonical Pipecat voice pipeline order:
+    #   transport.input → VADProcessor → STT → user_aggregator → LLM → TTS → transport.output → assistant_aggregator
+    pipeline_elements = [
+        real_transport.input(),
+        VADProcessor(vad_analyzer=SileroVADAnalyzer()),
+        stt,
+        user_aggregator,
+        llm,
+        tts,
+        real_transport.output(),
+        assistant_aggregator,
+    ]
+
+    pipeline = Pipeline(pipeline_elements)
+
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            audio_in_sample_rate=8000,
+            audio_out_sample_rate=8000,
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+        observers=[EventBridgeObserver()],
+    )
+
     return task
 
 
+# ── Main adapter ─────────────────────────────────────────────────────
 # ── Main adapter ─────────────────────────────────────────────────────
 
 class PipecatAdapter:
@@ -285,35 +307,10 @@ class PipecatAdapter:
                 session_id=self.session_id,
                 execution_id=self.execution_id,
             ).info("Running Pipecat adapter")
-            
-            await self.lifecycle.start()
-            
-            import os
-            import asyncio
-            if os.getenv("ENABLE_INITIAL_GREETING", "True").lower() == "true":
-                from pipecat.frames.frames import LLMMessagesAppendFrame
-                from app.events.event_types import AssistantGreetingStarted
-                
-                logger.bind(session_id=self.session_id).info("Queueing initial AI greeting")
-                
-                self.event_bus.publish_sync(
-                    AssistantGreetingStarted(session_id=self.session_id)
-                )
 
-                # Delay greeting to allow Twilio audio to fully connect
-                await asyncio.sleep(2.0)
-                await self.task.queue_frames([
-                    LLMMessagesAppendFrame(
-                        messages=[{
-                            "role": "system",
-                            "content": "A new phone conversation has just started. You are Sarah from Cybernauts Noida. Say exactly: 'Hello, I'm Sarah from Cybernauts Noida. How can I assist you?'"
-                        }],
-                        run_llm=True
-                    )
-                ])
-
-            # For the mock task: manually simulate processor events
+            # ── Mock path (tests only) ────────────────────────────────────
             if isinstance(self.task, MockPipecatPipelineTask):
+                await self.lifecycle.start()
                 for proc in self.task.processors:
                     name = getattr(proc, "name", "unknown")
                     self.bridge.on_processor_started(name)
@@ -321,14 +318,79 @@ class PipecatAdapter:
                     self.bridge.on_processor_completed(name)
                 await self.lifecycle.stop()
                 await self.lifecycle.wait_until_done()
-            else:
-                from pipecat.pipeline.runner import PipelineRunner
-                runner = PipelineRunner()
-                await runner.run(self.task)
+                return
+
+            # ── Real Pipecat 1.5.0 path ───────────────────────────────────
+            #
+            # GREETING STRATEGY:
+            # Use TTSSpeakFrame — the canonical Pipecat idiom for bot-initiated
+            # speech.  It bypasses the LLM entirely and goes straight to ElevenLabs
+            # TTS.  This removes LLM latency and any risk of a silent LLM drop.
+            #
+            # The frame is queued from a background asyncio.Task launched inside
+            # on_client_connected.  The task sleeps 1.5s to guarantee StartFrame has
+            # fully propagated through every processor before we inject speech.
+            # queue_frames() puts the frame in _push_queue which is drained in-order,
+            # so the TTSSpeakFrame always arrives after StartFrame is done.
+            from pipecat.pipeline.runner import PipelineRunner
+            from pipecat.frames.frames import TTSSpeakFrame
+            from app.events.event_types import AssistantGreetingStarted
+
+            pipecat_transport = self.transport.get_pipecat_transport()
+            enable_greeting = os.getenv("ENABLE_INITIAL_GREETING", "True").lower() == "true"
+            task_ref = self.task  # captured for closure
+
+            @pipecat_transport.event_handler("on_client_connected")
+            async def on_client_connected(transport, websocket):
+                logger.bind(session_id=self.session_id).info(
+                    "Transport: client connected — launching greeting task"
+                )
+                if not enable_greeting:
+                    return
+
+                async def _send_greeting():
+                    try:
+                        logger.bind(session_id=self.session_id).info(
+                            "Greeting task: sleeping 1.5s for pipeline to be fully ready..."
+                        )
+                        await asyncio.sleep(1.5)
+
+                        logger.bind(session_id=self.session_id).info(
+                            "Greeting task: queuing TTSSpeakFrame"
+                        )
+                        self.event_bus.publish_sync(
+                            AssistantGreetingStarted(session_id=self.session_id)
+                        )
+                        await task_ref.queue_frames([
+                            TTSSpeakFrame(
+                                text=(
+                                    "Hello! Thank you for calling Cybernauts Noida. "
+                                    "I'm Sarah, your virtual assistant. "
+                                    "How can I help you today?"
+                                ),
+                                append_to_context=True,
+                            )
+                        ])
+                        logger.bind(session_id=self.session_id).info(
+                            "Greeting task: TTSSpeakFrame queued successfully ✓"
+                        )
+                    except Exception as greet_err:
+                        logger.bind(session_id=self.session_id).exception(
+                            "Greeting task failed: {e}", e=greet_err
+                        )
+
+                # Fire and forget — do not block the transport event callback
+                asyncio.create_task(_send_greeting())
+
+            runner = PipelineRunner()
+            logger.bind(session_id=self.session_id).info(
+                "Starting PipelineRunner with task"
+            )
+            await runner.run(self.task)
 
         except Exception as e:
             self.bridge.on_pipeline_failed(e)
-            logger.bind(session_id=self.session_id).error(
+            logger.bind(session_id=self.session_id).exception(
                 "Pipecat adapter execution failed: {e}", e=e
             )
             raise PipecatAdapterError(f"Execution failed: {e}") from e

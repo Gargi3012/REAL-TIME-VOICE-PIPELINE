@@ -55,8 +55,9 @@ class TwilioTransportAdapter(PipecatTransportAdapter):
                 audio_in_sample_rate=8000,
                 audio_out_sample_rate=8000,
                 add_wav_header=False,
-                vad_enabled=False,       # Disabled to prevent pipecat from calling finalize() on Deepgram
-                vad_analyzer=_build_vad_analyzer(),
+                # Note: vad_enabled/vad_analyzer are NOT valid on FastAPIWebsocketParams in
+                # Pipecat 1.5.0. Deepgram handles its own endpointing via endpointing="300",
+                # so no transport-level VAD is needed for Twilio.
                 serializer=serializer,
             ),
         )

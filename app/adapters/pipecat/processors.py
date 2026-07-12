@@ -78,16 +78,18 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
 
         stt = DeepgramSTTService(
             api_key=DEEPGRAM_API_KEY,
+            encoding="linear16",
             sample_rate=8000,
+            channels=1,
             settings=DeepgramSTTService.Settings(
-                model=metadata.get("model", "nova-2"),
-                language=metadata.get("language", "hi"),
+                model=metadata.get("model", "nova-2-phonecall"),
+                language=metadata.get("language", "en-US"),
                 smart_format=metadata.get("smart_format", True),
                 interim_results=metadata.get("interim_results", True),
                 endpointing=metadata.get("endpointing", 300),
             ),
         )
-        logger.info("DeepgramSTTService created | model={m}", m=metadata.get("model", "nova-2"))
+        logger.info("DeepgramSTTService created | model={m}", m=metadata.get("model", "nova-2-phonecall"))
         return stt
 
     elif role == ProcessorRole.LLM:
@@ -99,25 +101,29 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
         model = metadata.get("model", GROQ_MODEL)
         llm = GroqLLMService(
             api_key=GROQ_API_KEY,
-            settings=GroqLLMService.Settings(
-                model=model,
-            )
+            settings=GroqLLMService.Settings(model=model),
         )
         logger.info("GroqLLMService created | model={m}", m=model)
         return llm
 
     elif role == ProcessorRole.TTS:
         from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
+        from app.config import ELEVENLABS_MODEL
 
         if not ELEVEN_LABS_API_KEY:
             raise ValueError("ELEVEN_LABS_API_KEY is not set in your .env file.")
 
         voice_id = metadata.get("voice_id", ELEVEN_LABS_VOICE_ID)
+        model_name = metadata.get("model", ELEVENLABS_MODEL)
         tts = ElevenLabsTTSService(
             api_key=ELEVEN_LABS_API_KEY,
+            auto_mode=True,  # Low-latency streaming mode (replaces optimize_streaming_latency)
             settings=ElevenLabsTTSService.Settings(
                 voice=voice_id,
-            )
+                model=model_name,
+                stability=0.5,
+                similarity_boost=0.8,
+            ),
         )
         logger.info("ElevenLabsTTSService created | voice_id={v}", v=voice_id)
         return tts
