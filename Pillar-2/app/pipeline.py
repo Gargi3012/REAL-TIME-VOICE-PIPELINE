@@ -50,17 +50,17 @@ def build_pipeline_task(
         model=settings.groq_model,
     )
 
-    # ---- TTS DISABLED FOR DEBUGGING — uncomment this whole block to re-enable ----
-    # tts = ElevenLabsTTSService(
-    #     api_key=settings.elevenlabs_api_key,
-    #     voice_id=settings.elevenlabs_voice_id,
-    #     model=settings.elevenlabs_model,
-    #     params=ElevenLabsTTSService.InputParams(
-    #         optimize_streaming_latency="4",  # must be a string ("0"-"4"); 4 = fastest
-    #         stability=0.5,
-    #         similarity_boost=0.8,
-    #     ),
-    # )
+    # ---- Pillar 4: TTS ----
+    tts = ElevenLabsTTSService(
+        api_key=settings.elevenlabs_api_key,
+        voice_id=settings.elevenlabs_voice_id,
+        model=settings.elevenlabs_model,
+        params=ElevenLabsTTSService.InputParams(
+            optimize_streaming_latency="4",  # must be a string ("0"-"4"); 4 = fastest
+            stability=0.5,
+            similarity_boost=0.8,
+        ),
+    )
 
     context = build_llm_context(company_context)
     context_aggregator = llm.create_context_aggregator(context)
@@ -84,8 +84,8 @@ def build_pipeline_task(
             context_aggregator.user(),     # append user turn to context
             llm,                           # text -> text (streamed)
             latency_logger,                # logs USER SAID / LLM REPLIED + timings
-            # tts,                         
-            transport.output(),            # audio out to WebRTC/SIP (silent while TTS is off)
+            tts,                         
+            transport.output(),            # audio out to WebRTC/SIP
             context_aggregator.assistant(),  # append assistant turn to context
         ]
     )

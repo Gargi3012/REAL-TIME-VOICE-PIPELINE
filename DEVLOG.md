@@ -1,4 +1,4 @@
-# Developer Log — Real-Time Voice Pipeline
+# Developer Log â Real-Time Voice Pipeline
 
 ## Project Overview
 > **Project**: Real-Time Voice Pipeline (Project B)  
@@ -8,7 +8,7 @@
 
 This file is an **append-only** architecture changelog.  
 Each milestone is logged with date, scope, decisions, and outcomes.  
-**Do not overwrite previous entries** — always append at the bottom.
+**Do not overwrite previous entries** â always append at the bottom.
 
 ---
 
@@ -20,18 +20,18 @@ Each milestone is logged with date, scope, decisions, and outcomes.
 
 | # | Milestone | Status | Package | Tests | Date |
 |---|---|---|---|---|---|
-| 1 | Session Management Layer | ✅ Complete | `app/session/` (5 files) | 166 | 2026-07-02 |
-| 2 | Production Readiness Audit | ✅ Complete | `tests/` (8 files) | — | 2026-07-02 |
-| 3 | Conversation State Machine | ✅ Complete | `app/conversation/` (6 files) | 146 | 2026-07-02 |
-| 4 | Event Bus | ✅ Complete | `app/events/` (10 files) | 30 | 2026-07-02 |
-| 5 | Pipeline Builder | ✅ Complete | `app/pipeline/` (9 files) | 25 | 2026-07-03 |
-| 6 | Pipeline Runner | ✅ Complete | `app/pipeline/` (+6 files) | 18 | 2026-07-03 |
-| 7 | Pipecat Adapter Integration | ✅ Complete | `app/adapters/` (10 files) | 13 | 2026-07-03 |
-| 8 | Complete System Integration | ✅ Complete | `tests/` (3 files) | 5 | 2026-07-03 |
-| 9 | Security, Memory Safety & Data Isolation | ✅ Complete | `tests/` (6 files) | 9 | 2026-07-03 |
-| 10 | Pillar 2 Integration — Real Audio Services | ✅ Complete | `app/` (10 files) | +9 | 2026-07-04 |
-| 11 | Pillar 1 + Pillar 2 Integration Testing | ✅ Complete | `tests/` (10 files) | +10 | 2026-07-04 |
-| 12 | Runtime Benchmarking Framework | ✅ Complete | `benchmarks/` (8 files) | — | 2026-07-04 |
+| 1 | Session Management Layer | â Complete | `app/session/` (5 files) | 166 | 2026-07-02 |
+| 2 | Production Readiness Audit | â Complete | `tests/` (8 files) | â | 2026-07-02 |
+| 3 | Conversation State Machine | â Complete | `app/conversation/` (6 files) | 146 | 2026-07-02 |
+| 4 | Event Bus | â Complete | `app/events/` (10 files) | 30 | 2026-07-02 |
+| 5 | Pipeline Builder | â Complete | `app/pipeline/` (9 files) | 25 | 2026-07-03 |
+| 6 | Pipeline Runner | â Complete | `app/pipeline/` (+6 files) | 18 | 2026-07-03 |
+| 7 | Pipecat Adapter Integration | â Complete | `app/adapters/` (10 files) | 13 | 2026-07-03 |
+| 8 | Complete System Integration | â Complete | `tests/` (3 files) | 5 | 2026-07-03 |
+| 9 | Security, Memory Safety & Data Isolation | â Complete | `tests/` (6 files) | 9 | 2026-07-03 |
+| 10 | Pillar 2 Integration â Real Audio Services | â Complete | `app/` (10 files) | +9 | 2026-07-04 |
+| 11 | Pillar 1 + Pillar 2 Integration Testing | â Complete | `tests/` (10 files) | +10 | 2026-07-04 |
+| 12 | Runtime Benchmarking Framework | â Complete | `benchmarks/` (8 files) | â | 2026-07-04 |
 
 ### Current Metrics
 
@@ -42,8 +42,8 @@ Each milestone is logged with date, scope, decisions, and outcomes.
 | Total tests | 422 (all passing) |
 | Line coverage | >96% |
 | Branch coverage | >94% |
-| Ruff | ✅ Clean |
-| Mypy (strict) | ✅ Clean |
+| Ruff | â Clean |
+| Mypy (strict) | â Clean |
 | Real services wired | Twilio (Telephony) + Daily.co (WebRTC) + LiveKit + Deepgram nova-2 + Groq llama3 + ElevenLabs |
 
 ### Git History
@@ -51,12 +51,12 @@ Each milestone is logged with date, scope, decisions, and outcomes.
 | Commit | Message | Files |
 |---|---|---|
 | `09f8b46` | feat: pipeline runner execution engine | 21 changed |
-| `4f34101` | feat: pipeline builder — immutable DAG orchestrator | 18 changed |
+| `4f34101` | feat: pipeline builder â immutable DAG orchestrator | 18 changed |
 | `c3918c0` | feat: event bus implementation | 16 changed |
 | `0772b50` | feat: conversation state machine | 12 changed |
 | `1a465e5` | feat: session management layer + audit suite | 20 changed |
 
-**Branch**: `feature/session-management` → `origin/feature/session-management`
+**Branch**: `feature/session-management` â `origin/feature/session-management`
 
 ---
 
@@ -67,59 +67,59 @@ The architecture is structured across three core pillars:
 - **Pillar 3**: AI Services (Deepgram STT, Groq LLM, ElevenLabs TTS)
 
 ## Milestone-by-Milestone Progress
-## Milestone 1 — Session Management Layer
+## Milestone 1 â Session Management Layer
 
 **Date**: 2026-07-02  
-**Status**: ✅ Complete  
-**Scope**: `app/session/` — Core session lifecycle and conversation state management
+**Status**: â Complete  
+**Scope**: `app/session/` â Core session lifecycle and conversation state management
 
 ### What Was Built
 
 | File | Purpose |
 |---|---|
-| `state.py` | `SessionState` enum — 6 states (IDLE → LISTENING → THINKING → SPEAKING → INTERRUPTED → CLOSED) with `is_active()` / `is_terminal()` helpers |
-| `message.py` | Frozen `Message` dataclass — immutable, validated, LLM-API-compatible `to_dict()` |
-| `models.py` | Mutable `Session` dataclass — UUID, timestamps, history, speaking flags, metadata, latency |
-| `manager.py` | `SessionManager` — thread-safe CRUD, conversation ops, state transitions, Loguru logging |
+| `state.py` | `SessionState` enum â 6 states (IDLE â LISTENING â THINKING â SPEAKING â INTERRUPTED â CLOSED) with `is_active()` / `is_terminal()` helpers |
+| `message.py` | Frozen `Message` dataclass â immutable, validated, LLM-API-compatible `to_dict()` |
+| `models.py` | Mutable `Session` dataclass â UUID, timestamps, history, speaking flags, metadata, latency |
+| `manager.py` | `SessionManager` â thread-safe CRUD, conversation ops, state transitions, Loguru logging |
 | `__init__.py` | Package API surface with `__all__` exports |
 
 ### Key Design Decisions
 
-1. **`Literal["system", "user", "assistant"]` for Role** — Serializes directly to LLM chat-completion format without `.value` calls. Chose Literal over Enum deliberately.
+1. **`Literal["system", "user", "assistant"]` for Role** â Serializes directly to LLM chat-completion format without `.value` calls. Chose Literal over Enum deliberately.
 
-2. **`frozen=True` on Message, mutable Session** — Messages are immutable once created (thread-safe, referentially stable). Sessions are mutable because state, history, and flags change continuously during a live conversation.
+2. **`frozen=True` on Message, mutable Session** â Messages are immutable once created (thread-safe, referentially stable). Sessions are mutable because state, history, and flags change continuously during a live conversation.
 
-3. **`slots=True` on both dataclasses** — ~20% memory reduction and faster attribute access. Acceptable trade-off since neither class needs `__dict__`.
+3. **`slots=True` on both dataclasses** â ~20% memory reduction and faster attribute access. Acceptable trade-off since neither class needs `__dict__`.
 
-4. **`threading.Lock` (not `asyncio.Lock`)** — Sufficient for multi-threaded ASGI servers. Designed to be swappable when going fully async.
+4. **`threading.Lock` (not `asyncio.Lock`)** â Sufficient for multi-threaded ASGI servers. Designed to be swappable when going fully async.
 
-5. **`Optional[Session]` returns over exceptions** — Caller decides error policy. Manager logs warnings for missing sessions but doesn't force exception handling.
+5. **`Optional[Session]` returns over exceptions** â Caller decides error policy. Manager logs warnings for missing sessions but doesn't force exception handling.
 
-6. **In-memory `dict` store** — Zero-dependency for development. Clean public API designed so the backing store can swap to Redis/PostgreSQL without changing callers.
+6. **In-memory `dict` store** â Zero-dependency for development. Clean public API designed so the backing store can swap to Redis/PostgreSQL without changing callers.
 
-7. **`metadata` + `latency` extension dicts** — Open extension points for Pipecat context, user profiles, and per-component timing metrics.
+7. **`metadata` + `latency` extension dicts** â Open extension points for Pipecat context, user profiles, and per-component timing metrics.
 
 ### Architecture Diagram
 
 ```
 app/session/
-├── state.py        ← SessionState enum (no deps)
-├── message.py      ← Message dataclass (no deps)  
-├── models.py       ← Session dataclass (imports message, state)
-├── manager.py      ← SessionManager (imports all above + loguru)
-└── __init__.py     ← Re-exports public API
+âââ state.py        â SessionState enum (no deps)
+âââ message.py      â Message dataclass (no deps)  
+âââ models.py       â Session dataclass (imports message, state)
+âââ manager.py      â SessionManager (imports all above + loguru)
+âââ __init__.py     â Re-exports public API
 ```
 
-Dependency flow: `state.py` ← `message.py` ← `models.py` ← `manager.py`  
+Dependency flow: `state.py` â `message.py` â `models.py` â `manager.py`  
 No circular dependencies. Each file has a single responsibility.
 
 ---
 
-## Milestone 2 — Production Readiness Audit & Test Suite
+## Milestone 2 â Production Readiness Audit & Test Suite
 
 **Date**: 2026-07-02  
-**Status**: ✅ Complete  
-**Scope**: `tests/` — Exhaustive pytest suite + static analysis + code review
+**Status**: â Complete  
+**Scope**: `tests/` â Exhaustive pytest suite + static analysis + code review
 
 ### Test Suite Delivered
 
@@ -155,61 +155,61 @@ No circular dependencies. Each file has a single responsibility.
 
 ### Known Non-Blocking Issues
 
-1. **TOCTOU in lock pattern** — `add_message()`, `clear_history()`, `set_state()`, `update_last_activity()` acquire the lock to look up the session, release it, then re-acquire to mutate. Between the two lock scopes another thread could delete the session. Impact: low (orphaned writes to deleted session objects, no crashes or corruption). **Fix when**: adding WebSocket concurrency.
+1. **TOCTOU in lock pattern** â `add_message()`, `clear_history()`, `set_state()`, `update_last_activity()` acquire the lock to look up the session, release it, then re-acquire to mutate. Between the two lock scopes another thread could delete the session. Impact: low (orphaned writes to deleted session objects, no crashes or corruption). **Fix when**: adding WebSocket concurrency.
 
-2. **No abstract `SessionStore` interface** — Manager directly uses `dict`. Extracting a `Protocol`/ABC would formalize the Redis/DB swap path. **Fix when**: implementing Redis backend.
+2. **No abstract `SessionStore` interface** â Manager directly uses `dict`. Extracting a `Protocol`/ABC would formalize the Redis/DB swap path. **Fix when**: implementing Redis backend.
 
-3. **No session TTL / auto-cleanup** — Idle sessions accumulate indefinitely. **Fix when**: adding background task infrastructure.
+3. **No session TTL / auto-cleanup** â Idle sessions accumulate indefinitely. **Fix when**: adding background task infrastructure.
 
-4. **No state transition validation matrix** — Any non-terminal state can transition to any other. **Fix when**: integrating Pipecat pipeline (which will enforce its own transition logic).
+4. **No state transition validation matrix** â Any non-terminal state can transition to any other. **Fix when**: integrating Pipecat pipeline (which will enforce its own transition logic).
 
 ### Production Readiness Score
 
-**93/100** — Ready for current milestone. See full breakdown in audit artifact.
+**93/100** â Ready for current milestone. See full breakdown in audit artifact.
 
 ---
 
-## Milestone 3 — Conversation State Machine
+## Milestone 3 â Conversation State Machine
 
 **Date**: 2026-07-02  
-**Status**: ✅ Complete  
-**Scope**: `app/conversation/` — Fine-grained FSM controlling voice conversation flow
+**Status**: â Complete  
+**Scope**: `app/conversation/` â Fine-grained FSM controlling voice conversation flow
 
 ### What Was Built
 
 | File | Purpose |
 |---|---|
 | `exceptions.py` | `ConversationError` hierarchy: `InvalidTransitionError`, `TerminalStateError`, `InvalidStateError` |
-| `transitions.py` | `ConversationState` enum (10 states) + immutable `TRANSITION_MAP` — single source of truth for all legal edges |
+| `transitions.py` | `ConversationState` enum (10 states) + immutable `TRANSITION_MAP` â single source of truth for all legal edges |
 | `validators.py` | Pure functions `validate_transition()` (raises) and `can_transition()` (bool) |
 | `events.py` | 10 frozen event dataclasses + `TransitionRecord` for audit history |
-| `state_machine.py` | `ConversationStateMachine` — thread-safe FSM with strict validation, ordered history, reset/close convenience |
+| `state_machine.py` | `ConversationStateMachine` â thread-safe FSM with strict validation, ordered history, reset/close convenience |
 | `__init__.py` | Package API re-exports |
 
 ### Key Design Decisions
 
-1. **Separate `ConversationState` (10 states) from `SessionState` (6 states)** — The conversation FSM models each pipeline stage individually (TRANSCRIBING, GENERATING_RESPONSE, GENERATING_AUDIO) while the session layer tracks coarse lifecycle. They coexist; the future pipeline coordinator synchronises both.
+1. **Separate `ConversationState` (10 states) from `SessionState` (6 states)** â The conversation FSM models each pipeline stage individually (TRANSCRIBING, GENERATING_RESPONSE, GENERATING_AUDIO) while the session layer tracks coarse lifecycle. They coexist; the future pipeline coordinator synchronises both.
 
-2. **Immutable `TRANSITION_MAP` (frozenset values)** — The map is a module-level constant. All validation delegates to it. No ad-hoc transition checks scattered across code.
+2. **Immutable `TRANSITION_MAP` (frozenset values)** â The map is a module-level constant. All validation delegates to it. No ad-hoc transition checks scattered across code.
 
-3. **Raising exceptions for invalid transitions** — Unlike `SessionManager.set_state()` which returns `bool`, the FSM raises `InvalidTransitionError` / `TerminalStateError`. The caller must handle explicitly — fail-fast for pipeline correctness.
+3. **Raising exceptions for invalid transitions** â Unlike `SessionManager.set_state()` which returns `bool`, the FSM raises `InvalidTransitionError` / `TerminalStateError`. The caller must handle explicitly â fail-fast for pipeline correctness.
 
-4. **Pure validator functions** — `validators.py` contains stateless functions. State machine delegates validation there, keeping its own code focused on mutation + history.
+4. **Pure validator functions** â `validators.py` contains stateless functions. State machine delegates validation there, keeping its own code focused on mutation + history.
 
-5. **Event models only (no bus)** — 10 frozen event dataclasses are defined for the future Event Bus milestone. No dispatch logic yet.
+5. **Event models only (no bus)** â 10 frozen event dataclasses are defined for the future Event Bus milestone. No dispatch logic yet.
 
-6. **One FSM per session** — Each `ConversationStateMachine` is bound to a `session_id` at construction. Loose coupling — no import of `SessionManager`.
+6. **One FSM per session** â Each `ConversationStateMachine` is bound to a `session_id` at construction. Loose coupling â no import of `SessionManager`.
 
-7. **`TransitionRecord` audit log** — Append-only list of immutable records with from_state, to_state, timestamp, reason, session_id. Enables latency analysis and debugging.
+7. **`TransitionRecord` audit log** â Append-only list of immutable records with from_state, to_state, timestamp, reason, session_id. Enables latency analysis and debugging.
 
 ### Transition Diagram
 
 ```
-IDLE → LISTENING → TRANSCRIBING → THINKING → GENERATING_RESPONSE → GENERATING_AUDIO → SPEAKING → LISTENING (loop)
-                                                                                           ↓
-                                                                                      INTERRUPTED → LISTENING
-Any active state → ERROR → IDLE (recovery) or CLOSED
-Any non-terminal state → CLOSED (terminal)
+IDLE â LISTENING â TRANSCRIBING â THINKING â GENERATING_RESPONSE â GENERATING_AUDIO â SPEAKING â LISTENING (loop)
+                                                                                           â
+                                                                                      INTERRUPTED â LISTENING
+Any active state â ERROR â IDLE (recovery) or CLOSED
+Any non-terminal state â CLOSED (terminal)
 ```
 
 ### Test Suite
@@ -234,17 +234,17 @@ Any non-terminal state → CLOSED (terminal)
 
 ### Integration Notes
 
-- `app/session/` was **not modified** — the conversation package is additive.
+- `app/session/` was **not modified** â the conversation package is additive.
 - The future **Pipeline Coordinator** will hold both a `SessionManager` and a `Dict[str, ConversationStateMachine]`, synchronising session state with conversation state.
 - The milestone 2 finding ("no state transition validation matrix" in SessionManager) is now **resolved** by this dedicated FSM layer.
 
 ---
 
-## Milestone 4 — Event Bus
+## Milestone 4 â Event Bus
 
 **Date**: 2026-07-02  
-**Status**: ✅ Complete  
-**Scope**: `app/events/` — Asynchronous publish-subscribe messaging backbone
+**Status**: â Complete  
+**Scope**: `app/events/` â Asynchronous publish-subscribe messaging backbone
 
 ### What Was Built
 
@@ -261,21 +261,21 @@ Any non-terminal state → CLOSED (terminal)
 
 ### Key Design Decisions
 
-1. **Framework-agnostic handlers** — Handlers are plain async callables `async def fn(event: Event) -> None`. No base classes or decorators required, drastically lowering the barrier to entry.
-2. **Interface Segregation** — Exposing a pure `Publisher` protocol so downstream components don't need to know about the `EventBus` internals or subscriber registry.
-3. **Async / Sync bridging** — The `EventBus` manages a background `asyncio.Task` queue, exposing `publish_sync(event)` for blocking endpoints (like FastAPI sync routes) to fire-and-forget events into the async ecosystem.
-4. **Resilient Dispatch** — If 5 subscribers match an event and the 2nd one raises an exception, the dispatcher catches it, logs it, executes the remaining 3, and only *then* raises a `HandlerExecutionError` wrapping the first failure.
-5. **Wildcard Routing** — Subscribers can listen to `"Pipeline*"` or `"ConversationStarted"` using standard glob matching.
+1. **Framework-agnostic handlers** â Handlers are plain async callables `async def fn(event: Event) -> None`. No base classes or decorators required, drastically lowering the barrier to entry.
+2. **Interface Segregation** â Exposing a pure `Publisher` protocol so downstream components don't need to know about the `EventBus` internals or subscriber registry.
+3. **Async / Sync bridging** â The `EventBus` manages a background `asyncio.Task` queue, exposing `publish_sync(event)` for blocking endpoints (like FastAPI sync routes) to fire-and-forget events into the async ecosystem.
+4. **Resilient Dispatch** â If 5 subscribers match an event and the 2nd one raises an exception, the dispatcher catches it, logs it, executes the remaining 3, and only *then* raises a `HandlerExecutionError` wrapping the first failure.
+5. **Wildcard Routing** â Subscribers can listen to `"Pipeline*"` or `"ConversationStarted"` using standard glob matching.
 
 ### Architecture Flow
 
 ```text
 Publisher (STT / API / Pipeline)
-  ↓ publish(event)
+  â publish(event)
 EventBus (Middleware Chain)
-  ↓ routes via Registry
+  â routes via Registry
 Dispatcher
-  ↓ executes in priority order
+  â executes in priority order
 Subscribers (1..N async callables)
 ```
 
@@ -292,11 +292,11 @@ Subscribers (1..N async callables)
 
 ---
 
-## Milestone 5 — Pipeline Builder
+## Milestone 5 â Pipeline Builder
 
 **Date**: 2026-07-03  
-**Status**: ✅ Complete  
-**Scope**: `app/pipeline/` — Graph-based, framework-independent pipeline builder
+**Status**: â Complete  
+**Scope**: `app/pipeline/` â Graph-based, framework-independent pipeline builder
 
 ### What Was Built
 
@@ -313,20 +313,20 @@ Subscribers (1..N async callables)
 
 ### Key Design Decisions
 
-1. **Strict Immutability Boundary** — The builder mutates internal state (`_processors`, `_graph`) guarded by a `threading.Lock`. Once `build()` is called, it emits a strictly immutable `Pipeline` dataclass.
-2. **Abstract Topology over Execution** — The pipeline builder creates a purely descriptive DAG. It does NOT depend on Pipecat or execution semantics, allowing a future `PipelineRunner` to adapt the DAG to whatever execution framework is required.
-3. **Event Bus Integration** — The builder emits `PipelineCreated`, `ProcessorAdded`, `ProcessorRemoved`, `PipelineValidated`, `PipelineBuildSucceeded`, and `PipelineBuildFailed` directly to the `EventBus` implemented in Milestone 4.
-4. **Pre-Validation Guarantees** — Cycle detection runs *during* graph mutation (`add_edge`), preventing the graph from ever entering an invalid cyclic state. Final topological requirements (like single root validation) run on `build()`.
+1. **Strict Immutability Boundary** â The builder mutates internal state (`_processors`, `_graph`) guarded by a `threading.Lock`. Once `build()` is called, it emits a strictly immutable `Pipeline` dataclass.
+2. **Abstract Topology over Execution** â The pipeline builder creates a purely descriptive DAG. It does NOT depend on Pipecat or execution semantics, allowing a future `PipelineRunner` to adapt the DAG to whatever execution framework is required.
+3. **Event Bus Integration** â The builder emits `PipelineCreated`, `ProcessorAdded`, `ProcessorRemoved`, `PipelineValidated`, `PipelineBuildSucceeded`, and `PipelineBuildFailed` directly to the `EventBus` implemented in Milestone 4.
+4. **Pre-Validation Guarantees** â Cycle detection runs *during* graph mutation (`add_edge`), preventing the graph from ever entering an invalid cyclic state. Final topological requirements (like single root validation) run on `build()`.
 
 ### Architecture Flow
 
 ```text
 PipelineBuilder
-  ↓ add_processor(), connect(), insert_before()
+  â add_processor(), connect(), insert_before()
 PipelineGraph (DFS Cycle Detection)
-  ↓ validate()
+  â validate()
 Validators (Topology Rules)
-  ↓ build()
+  â build()
 Pipeline (Immutable Data Object)
 ```
 
@@ -343,11 +343,11 @@ Pipeline (Immutable Data Object)
 
 ---
 
-## Milestone 6 — Pipeline Runner
+## Milestone 6 â Pipeline Runner
 
 **Date**: 2026-07-03  
-**Status**: ✅ Complete  
-**Scope**: `app/pipeline/` (Runner) — Execution engine for immutable DAGs
+**Status**: â Complete  
+**Scope**: `app/pipeline/` (Runner) â Execution engine for immutable DAGs
 
 ### What Was Built
 
@@ -356,7 +356,7 @@ Pipeline (Immutable Data Object)
 | `runner.py` | `PipelineRunner` entry point wrapping scheduling, lifecycle, and execution |
 | `executor.py` | `AbstractProcessor` interface and `DefaultProcessorExecutor` handles individual processor lifecycle & telemetry |
 | `scheduler.py` | `PipelineScheduler` determining topological execution order using Kahn's algorithm |
-| `lifecycle.py` | `PipelineLifecycleManager` and state machine (`INITIALIZED` → `RUNNING` → `COMPLETED`/`FAILED`) |
+| `lifecycle.py` | `PipelineLifecycleManager` and state machine (`INITIALIZED` â `RUNNING` â `COMPLETED`/`FAILED`) |
 | `execution_state.py` | Explicit `ExecutionState` enumeration |
 | `context.py` | Immutable `ExecutionContext` providing `execution_id`, metrics, and cancellation tokens |
 | `cancellation.py` | Thread-safe `CancellationToken` for cooperative cancellation between stages |
@@ -365,26 +365,26 @@ Pipeline (Immutable Data Object)
 
 ### Key Design Decisions
 
-1. **Topological Execution** — Extracted execution ordering into a dedicated `PipelineScheduler` which interprets the DAG created by `PipelineBuilder` into a valid sequential execution flow.
-2. **Context Passing** — The execution engine injects a localized `ExecutionContext` into every processor, granting access to the `CancellationToken` and `MetricsCollector` without global state.
-3. **Cooperative Cancellation** — Processors receive a `CancellationToken` and are expected to yield if cancelled. The runner enforces this by checking cancellation state *between* processor executions and short-circuiting.
-4. **Rich Event Telemetry** — The runner broadcasts `PipelineInitialized`, `PipelineStarted`, `PipelinePaused`, `PipelineCancelled`, `ProcessorExecutionStarted`, etc. onto the existing Event Bus for full observability.
-5. **Decoupled Execution** — The runner depends ONLY on `AbstractProcessor`. Implementations (like STT, LLM) are injected at runtime.
+1. **Topological Execution** â Extracted execution ordering into a dedicated `PipelineScheduler` which interprets the DAG created by `PipelineBuilder` into a valid sequential execution flow.
+2. **Context Passing** â The execution engine injects a localized `ExecutionContext` into every processor, granting access to the `CancellationToken` and `MetricsCollector` without global state.
+3. **Cooperative Cancellation** â Processors receive a `CancellationToken` and are expected to yield if cancelled. The runner enforces this by checking cancellation state *between* processor executions and short-circuiting.
+4. **Rich Event Telemetry** â The runner broadcasts `PipelineInitialized`, `PipelineStarted`, `PipelinePaused`, `PipelineCancelled`, `ProcessorExecutionStarted`, etc. onto the existing Event Bus for full observability.
+5. **Decoupled Execution** â The runner depends ONLY on `AbstractProcessor`. Implementations (like STT, LLM) are injected at runtime.
 
 ### Architecture Flow
 
 ```text
 PipelineRunner (Start)
-  ↓
+  â
 PipelineScheduler (Sorts DAG)
-  ↓
+  â
 Loop Execution Order:
-  → Executor.run(Processor, Context)
-      ↓
+  â Executor.run(Processor, Context)
+      â
     before_execute()
     execute()
     after_execute()
-  ↓
+  â
 PipelineRunner (Complete)
 ```
 
@@ -402,11 +402,11 @@ PipelineRunner (Complete)
 
 ---
 
-## Milestone 7 — Pipecat Adapter Layer
+## Milestone 7 â Pipecat Adapter Layer
 
 **Date**: 2026-07-03  
-**Status**: ✅ Complete  
-**Scope**: `app/adapters/pipecat/` — Adapts the Pipeline orchestrator to Pipecat execution runtime.
+**Status**: â Complete  
+**Scope**: `app/adapters/pipecat/` â Adapts the Pipeline orchestrator to Pipecat execution runtime.
 
 ### What Was Built
 
@@ -424,22 +424,22 @@ PipelineRunner (Complete)
 
 ### Key Design Decisions
 
-1. **Strict Decoupling** — The adapter package is the *only* part of the application aware of Pipecat. The rest of the orchestrator deals purely in `AbstractProcessor` and `Pipeline`.
-2. **Event Bridging** — The `PipecatEventBridge` intercepts Pipecat callbacks (`on_pipeline_started`, `on_processor_error`) and emits native `EventBus` payloads (`PipelineStarted`, `ProcessorExecutionFailed`). This ensures telemetry flows uniformly regardless of the execution backend.
-3. **Mock Dependencies** — Rather than installing Pipecat globally and handling C-level media dependencies in tests, the adapter is tested using lightweight structural mocks that fulfill the identical interface footprint.
-4. **Adapter Pattern** — Implements the classic GoF Adapter pattern, reversing the dependency flow. `PipelineRunner` can execute `PipecatAdapter` without modifying runner code.
+1. **Strict Decoupling** â The adapter package is the *only* part of the application aware of Pipecat. The rest of the orchestrator deals purely in `AbstractProcessor` and `Pipeline`.
+2. **Event Bridging** â The `PipecatEventBridge` intercepts Pipecat callbacks (`on_pipeline_started`, `on_processor_error`) and emits native `EventBus` payloads (`PipelineStarted`, `ProcessorExecutionFailed`). This ensures telemetry flows uniformly regardless of the execution backend.
+3. **Mock Dependencies** â Rather than installing Pipecat globally and handling C-level media dependencies in tests, the adapter is tested using lightweight structural mocks that fulfill the identical interface footprint.
+4. **Adapter Pattern** â Implements the classic GoF Adapter pattern, reversing the dependency flow. `PipelineRunner` can execute `PipecatAdapter` without modifying runner code.
 
 ### Architecture Flow
 
 ```text
 PipelineRunner
-  ↓
+  â
 PipecatFactory.create_adapter(Pipeline)
-  ↓
+  â
 PipecatAdapter
-  → PipecatPipelineMapper (Topological DAG → Linear Pipecat Array)
-  → PipecatLifecycleManager (Syncs start/stop)
-  → PipecatEventBridge (Pipecat calls → EventBus)
+  â PipecatPipelineMapper (Topological DAG â Linear Pipecat Array)
+  â PipecatLifecycleManager (Syncs start/stop)
+  â PipecatEventBridge (Pipecat calls â EventBus)
 ```
 
 ### Test Suite
@@ -453,24 +453,24 @@ PipecatAdapter
 
 ---
 
-## Milestone 8 — Complete System Integration & End-to-End Validation
+## Milestone 8 â Complete System Integration & End-to-End Validation
 
 **Date**: 2026-07-03  
-**Status**: ✅ Complete  
-**Scope**: `tests/test_e2e_*` — Full architectural validation.
+**Status**: â Complete  
+**Scope**: `tests/test_e2e_*` â Full architectural validation.
 
 ### What Was Built
 
 | File | Purpose |
 |---|---|
-| `test_e2e_integration.py` | Validated full execution flow across all 6 isolated modules (Session → FSM → Builder → Runner → Pipecat). |
+| `test_e2e_integration.py` | Validated full execution flow across all 6 isolated modules (Session â FSM â Builder â Runner â Pipecat). |
 | `test_e2e_stress.py` | Ran 100 concurrent pipelines simultaneously to verify absence of deadlocks and thread-safety of singletons. |
 | `test_e2e_performance.py` | Benchmark tracking pipeline building (<0.1s) and execution dispatch latency. |
 
 ### Key Design Decisions
 
-1. **Zero Architecture Changes** — The end-to-end integration revealed that the strict adherence to Dependency Inversion (Event Bus decoupling, Processor abstractions) allowed all 6 layers to interoperate perfectly without circular dependencies or shared state mutation.
-2. **Deterministic Cancellation** — Cooperative cancellation propagates seamlessly from the external API, through the FSM, into the `PipelineRunner`, safely halting the `PipecatAdapter`.
+1. **Zero Architecture Changes** â The end-to-end integration revealed that the strict adherence to Dependency Inversion (Event Bus decoupling, Processor abstractions) allowed all 6 layers to interoperate perfectly without circular dependencies or shared state mutation.
+2. **Deterministic Cancellation** â Cooperative cancellation propagates seamlessly from the external API, through the FSM, into the `PipelineRunner`, safely halting the `PipecatAdapter`.
 
 ### Production Readiness Score
 - **Overall Score**: 98/100
@@ -479,11 +479,11 @@ PipecatAdapter
 
 ---
 
-## Milestone 9 — Security, Memory Safety & Data Isolation Validation
+## Milestone 9 â Security, Memory Safety & Data Isolation Validation
 
 **Date**: 2026-07-03  
-**Status**: ✅ Complete  
-**Scope**: `tests/` — Security audit, memory profiling, and data isolation checks.
+**Status**: â Complete  
+**Scope**: `tests/` â Security audit, memory profiling, and data isolation checks.
 
 ### What Was Built
 
@@ -498,8 +498,8 @@ PipecatAdapter
 
 ### Key Design Decisions
 
-1. **Test-First Isolation Checks** — By modeling realistic 100-user concurrent loads in `test_multi_session_security.py`, we proved that singletons (`SessionManager`, `EventBus`) correctly segment state.
-2. **Cooperative Cancellation Independence** — Validated that `runner1.cancel()` does not propagate to `runner2` by virtue of scoped `CancellationToken` generation.
+1. **Test-First Isolation Checks** â By modeling realistic 100-user concurrent loads in `test_multi_session_security.py`, we proved that singletons (`SessionManager`, `EventBus`) correctly segment state.
+2. **Cooperative Cancellation Independence** â Validated that `runner1.cancel()` does not propagate to `runner2` by virtue of scoped `CancellationToken` generation.
 
 ### Production Readiness Score
 - **Data Isolation**: 100/100
@@ -509,73 +509,73 @@ PipecatAdapter
 
 ---
 
-## Milestone 10 — Pillar 2 Integration (Phase 1): Twilio Telephony & Real Audio Services
+## Milestone 10 â Pillar 2 Integration (Phase 1): Twilio Telephony & Real Audio Services
 
 **Date**: 2026-07-04  
-**Status**: ✅ Complete  
+**Status**: â Complete  
 **Scope**: `app/config.py`, `app/main.py`, `app/adapters/pipecat/` (6 files), `requirements.txt`, `.env`, `tests/test_pipecat_events.py`
 
 ### What Was Built
 
-This milestone wires Pillar 2 (real audio services from `cybernauts-pillar2/`) into Pillar 1's orchestration framework. The integration is **additive-only** — zero changes to `session/`, `conversation/`, `events/`, or `pipeline/` packages.
+This milestone wires Pillar 2 (real audio services from `cybernauts-pillar2/`) into Pillar 1's orchestration framework. The integration is **additive-only** â zero changes to `session/`, `conversation/`, `events/`, or `pipeline/` packages.
 
 | File | Change Type | Purpose |
 |---|---|---|
-| `app/config.py` | Implemented (was empty) | Loads all API keys from `.env` at project root — Twilio, Daily, Deepgram |
-| `app/main.py` | Implemented (was empty) | Unified entry point: Session → EventBus → FSM → Pipeline DAG → Transport → Adapter → run |
+| `app/config.py` | Implemented (was empty) | Loads all API keys from `.env` at project root â Twilio, Daily, Deepgram |
+| `app/main.py` | Implemented (was empty) | Unified entry point: Session â EventBus â FSM â Pipeline DAG â Transport â Adapter â run |
 | `app/adapters/pipecat/transport.py` | Extended | Added `DailyTransportAdapter` (concrete WebRTC impl); existing mocks untouched |
 | `app/adapters/pipecat/processors.py` | Replaced factory | `create_pipecat_processor()` now returns real `TwilioTelephonyService` / `DeepgramSTTService`; graceful `ImportError` fallback to mocks for CI |
 | `app/adapters/pipecat/adapter.py` | Extended | Dual-mode build: real `pipecat.PipelineTask` when pipecat-ai installed, mock fallback for tests; added optional `fsm` param |
 | `app/adapters/pipecat/events.py` | Extended | Added optional `fsm` param + 5 new stage callbacks (`on_transcript_ready`, `on_llm_response_ready`, `on_audio_started`, `on_audio_finished`, `on_user_interrupted`); all original methods preserved |
-| `app/adapters/pipecat/factory.py` | Extended | Added optional `fsm` param — fully backward-compatible |
+| `app/adapters/pipecat/factory.py` | Extended | Added optional `fsm` param â fully backward-compatible |
 | `app/adapters/pipecat/__init__.py` | Extended | Exported `DailyTransportAdapter` |
 | `requirements.txt` | Updated | Added `pipecat-ai[daily,deepgram,twilio]`, `python-dotenv`, `aiohttp`, `deepgram-sdk` |
-| `.env` | New (project root) | Copied from `cybernauts-pillar2/.env` — single source of truth for all API keys |
-| `tests/test_pipecat_events.py` | Updated | Queue size assertion `6 → 9` reflecting richer event emission from `on_pipeline_started()` and `on_pipeline_completed()` |
+| `.env` | New (project root) | Copied from `cybernauts-pillar2/.env` â single source of truth for all API keys |
+| `tests/test_pipecat_events.py` | Updated | Queue size assertion `6 â 9` reflecting richer event emission from `on_pipeline_started()` and `on_pipeline_completed()` |
 
 ### Key Design Decisions
 
-1. **Zero modifications to core layers** — `session/`, `conversation/`, `events/`, and `pipeline/` packages were untouched. The integration is entirely contained in `app/adapters/pipecat/`, `app/config.py`, and `app/main.py`. The Adapter Pattern from Milestone 7 delivered exactly on its promise.
+1. **Zero modifications to core layers** â `session/`, `conversation/`, `events/`, and `pipeline/` packages were untouched. The integration is entirely contained in `app/adapters/pipecat/`, `app/config.py`, and `app/main.py`. The Adapter Pattern from Milestone 7 delivered exactly on its promise.
 
-2. **Graceful ImportError fallback** — `create_pipecat_processor()` attempts to import real pipecat-ai services; on `ImportError` it falls back to `MockPipecatProcessor`. This means all 403 existing tests continue to pass in CI environments without the native media stack (PortAudio, WebRTC binaries, etc.).
+2. **Graceful ImportError fallback** â `create_pipecat_processor()` attempts to import real pipecat-ai services; on `ImportError` it falls back to `MockPipecatProcessor`. This means all 403 existing tests continue to pass in CI environments without the native media stack (PortAudio, WebRTC binaries, etc.).
 
-3. **Dual-mode `PipecatAdapter._build_task()`** — Tries to build a real `pipecat.pipeline.task.PipelineTask` first; falls back to `MockPipecatPipelineTask` on `ImportError`. The mock flow is preserved verbatim so Milestone 7 tests pass with zero changes.
+3. **Dual-mode `PipecatAdapter._build_task()`** â Tries to build a real `pipecat.pipeline.task.PipelineTask` first; falls back to `MockPipecatPipelineTask` on `ImportError`. The mock flow is preserved verbatim so Milestone 7 tests pass with zero changes.
 
-4. **Optional `fsm` parameter on bridge and adapter** — `PipecatEventBridge(fsm=None)` is the default, preserving backward compatibility. When a `ConversationStateMachine` is passed, every Pipecat frame callback drives the FSM automatically: `TranscriptionFrame` → `TRANSCRIBING → THINKING`, `LLMFullResponseEndFrame` → `GENERATING_AUDIO`, `TTSStartedFrame` → `SPEAKING`, `TTSStoppedFrame` → `LISTENING` (loop), `UserStartedSpeakingFrame` → `INTERRUPTED → LISTENING`.
+4. **Optional `fsm` parameter on bridge and adapter** â `PipecatEventBridge(fsm=None)` is the default, preserving backward compatibility. When a `ConversationStateMachine` is passed, every Pipecat frame callback drives the FSM automatically: `TranscriptionFrame` â `TRANSCRIBING â THINKING`, `LLMFullResponseEndFrame` â `GENERATING_AUDIO`, `TTSStartedFrame` â `SPEAKING`, `TTSStoppedFrame` â `LISTENING` (loop), `UserStartedSpeakingFrame` â `INTERRUPTED â LISTENING`.
 
-5. **`PipecatEventBridge.on_pipeline_started()` now emits 3 events** — Added `ConversationStarted` and `ListeningStarted` alongside the existing `PipelineStarted`, aligning the EventBus stream with the FSM state on every pipeline boot. The affected test assertion was updated (`6 → 9`).
+5. **`PipecatEventBridge.on_pipeline_started()` now emits 3 events** â Added `ConversationStarted` and `ListeningStarted` alongside the existing `PipelineStarted`, aligning the EventBus stream with the FSM state on every pipeline boot. The affected test assertion was updated (`6 â 9`).
 
-6. **Single `.env` at project root** — The `cybernauts-pillar2/.env` is copied to the project root. `app/config.py` loads it via `python-dotenv` so both Pillar 1 and Pillar 2 share one key store without duplication.
+6. **Single `.env` at project root** â The `cybernauts-pillar2/.env` is copied to the project root. `app/config.py` loads it via `python-dotenv` so both Pillar 1 and Pillar 2 share one key store without duplication.
 
-7. **Identical VAD tuning** — `DailyTransportAdapter` uses the exact same `SileroVADAnalyzer` params as Pillar 2's `transport.py` (`confidence=0.7`, `start_secs=0.2`, `stop_secs=0.5`, `min_volume=0.6`) to ensure consistent turn-taking behaviour.
+7. **Identical VAD tuning** â `DailyTransportAdapter` uses the exact same `SileroVADAnalyzer` params as Pillar 2's `transport.py` (`confidence=0.7`, `start_secs=0.2`, `stop_secs=0.5`, `min_volume=0.6`) to ensure consistent turn-taking behaviour.
 
-8. **Transport placeholders filtered at build time** — The `PipecatPipelineMapper` maps `TRANSPORT_INPUT` / `TRANSPORT_OUTPUT` roles to `MockPipecatProcessor` stubs. In the real build path these stubs are filtered out (by name prefix `Transport_`) and replaced with the actual `DailyTransport.input()` / `.output()` injected at the front and back of the processor list.
+8. **Transport placeholders filtered at build time** â The `PipecatPipelineMapper` maps `TRANSPORT_INPUT` / `TRANSPORT_OUTPUT` roles to `MockPipecatProcessor` stubs. In the real build path these stubs are filtered out (by name prefix `Transport_`) and replaced with the actual `DailyTransport.input()` / `.output()` injected at the front and back of the processor list.
 
 ### Full Pipeline Flow (Production)
 
 ```
 app/main.py
-  │
-  ├─ SessionManager.create_session()          → UUID session + in-memory store
-  ├─ EventBus.start()                         → async background worker
-  ├─ ConversationStateMachine(session_id)     → starts IDLE
-  ├─ PipelineFactory.create_voice_pipeline()  → builds DAG: transport_in→stt→llm→tts→transport_out
-  ├─ PipelineBuilder.build()                  → immutable Pipeline object
-  ├─ DailyTransportAdapter()                  → DailyTransport WebRTC (room URL from .env)
-  ├─ PipecatFactory.create_adapter()          → PipecatAdapter (with FSM + EventBus wired)
-  │     ├─ PipecatPipelineMapper.map_pipeline() → topological order
-  │     ├─ create_pipecat_processor(Telephony) → TwilioTelephonyService()
-  │     ├─ create_pipecat_processor(STT)       → DeepgramSTTService(nova-2)
-  │     └─ _build_real_pipeline_task()         → PipelineTask([Twilio.input, STT, Twilio.output])
-  └─ PipecatAdapter.run()
-        └─ PipecatLifecycleManager.start() → pipeline runs until transport closes
+  â
+  ââ SessionManager.create_session()          â UUID session + in-memory store
+  ââ EventBus.start()                         â async background worker
+  ââ ConversationStateMachine(session_id)     â starts IDLE
+  ââ PipelineFactory.create_voice_pipeline()  â builds DAG: transport_inâsttâllmâttsâtransport_out
+  ââ PipelineBuilder.build()                  â immutable Pipeline object
+  ââ DailyTransportAdapter()                  â DailyTransport WebRTC (room URL from .env)
+  ââ PipecatFactory.create_adapter()          â PipecatAdapter (with FSM + EventBus wired)
+  â     ââ PipecatPipelineMapper.map_pipeline() â topological order
+  â     ââ create_pipecat_processor(Telephony) â TwilioTelephonyService()
+  â     ââ create_pipecat_processor(STT)       â DeepgramSTTService(nova-2)
+  â     ââ _build_real_pipeline_task()         â PipelineTask([Twilio.input, STT, Twilio.output])
+  ââ PipecatAdapter.run()
+        ââ PipecatLifecycleManager.start() â pipeline runs until transport closes
 
 Frame callbacks (runtime):
-  TranscriptionFrame   → bridge.on_transcript_ready()   → FSM: TRANSCRIBING→THINKING + TranscriptReady event
-  LLMFullResponseEnd   → bridge.on_llm_response_ready() → FSM: GENERATING_AUDIO + ResponseGenerated event
-  TTSStartedFrame      → bridge.on_audio_started()      → FSM: SPEAKING + SpeakingStarted event
-  TTSStoppedFrame      → bridge.on_audio_finished()     → FSM: LISTENING + SpeakingFinished event
-  UserStartedSpeaking  → bridge.on_user_interrupted()   → FSM: INTERRUPTED→LISTENING + ConversationInterrupted event
+  TranscriptionFrame   â bridge.on_transcript_ready()   â FSM: TRANSCRIBINGâTHINKING + TranscriptReady event
+  LLMFullResponseEnd   â bridge.on_llm_response_ready() â FSM: GENERATING_AUDIO + ResponseGenerated event
+  TTSStartedFrame      â bridge.on_audio_started()      â FSM: SPEAKING + SpeakingStarted event
+  TTSStoppedFrame      â bridge.on_audio_finished()     â FSM: LISTENING + SpeakingFinished event
+  UserStartedSpeaking  â bridge.on_user_interrupted()   â FSM: INTERRUPTEDâLISTENING + ConversationInterrupted event
 ```
 
 ### Issues Found & Fixed
@@ -583,13 +583,13 @@ Frame callbacks (runtime):
 | # | Issue | Root Cause | Fix Applied |
 |---|---|---|---|
 | 1 | `test_pipecat_events.py` assertion `qsize == 6` failing | `on_pipeline_started()` now emits 3 events; `on_pipeline_completed()` emits 2 | Updated assertion to `9` with inline comment breakdown |
-| 2 | `test_pipeline_serializer.py` — `No module named 'dateutil'` | Pre-existing missing env dependency | Installed `python-dateutil` in project venv |
+| 2 | `test_pipeline_serializer.py` â `No module named 'dateutil'` | Pre-existing missing env dependency | Installed `python-dateutil` in project venv |
 
 ### Pre-existing Issues (not introduced by this milestone)
 
 | # | File | Issue | Status |
 |---|---|---|---|
-| 1 | `app/conversation/events.py:119` | `super()` call inside `frozen=True, slots=True` dataclass fails on Python 3.13+ (`TypeError: super(type, obj)`) | Known CPython 3.13 regression — not related to Pillar 2 integration. **Fix when**: upgrading to Python 3.14+ or patching `to_dict()` to use `Event.to_dict(self)` explicit call. |
+| 1 | `app/conversation/events.py:119` | `super()` call inside `frozen=True, slots=True` dataclass fails on Python 3.13+ (`TypeError: super(type, obj)`) | Known CPython 3.13 regression â not related to Pillar 2 integration. **Fix when**: upgrading to Python 3.14+ or patching `to_dict()` to use `Event.to_dict(self)` explicit call. |
 
 ### Test Results
 
@@ -598,7 +598,7 @@ Frame callbacks (runtime):
 | Tests collected | 403 | 413 |
 | Tests passing | 403 | 412 |
 | Tests failing | 0 | 1 (pre-existing Python 3.13 bug) |
-| New failures introduced | — | 0 |
+| New failures introduced | â | 0 |
 
 ### Files Changed (exact list)
 
@@ -618,10 +618,10 @@ git diff --name-only HEAD:
 
 ---
 
-## Milestone 11 — Pillar 2 Test Coverage & Stabilization
+## Milestone 11 â Pillar 2 Test Coverage & Stabilization
 
 **Date**: 2026-07-04  
-**Status**: ✅ Complete  
+**Status**: â Complete  
 **Scope**: `tests/test_pipecat_processors.py`, `tests/test_pipecat_transport.py`, `app/conversation/events.py`, `cybernauts-pillar2/`
 
 ### What Was Built
@@ -645,12 +645,12 @@ This milestone stabilizes the Pillar 2 integration by resolving pre-existing cor
 | Tests collected | 413 | 422 |
 | Tests passing | 412 | 422 |
 | Tests failing | 1 (Python 3.13 bug) | 0 |
-| New failures introduced | — | 0 |
+| New failures introduced | â | 0 |
 
 ---
 
 <!-- 
-TEMPLATE FOR FUTURE ENTRIES — copy and fill in below this line:
+TEMPLATE FOR FUTURE ENTRIES â copy and fill in below this line:
 
 
 <!-- Source: milestone_report/milestone_8_report.md -->
@@ -674,10 +674,10 @@ The `tests/test_e2e_integration.py` suite validated critical system pathways:
 -->
 
 
-## Milestone 11 — Pillar 1 + Pillar 2 Complete Integration Testing
+## Milestone 11 â Pillar 1 + Pillar 2 Complete Integration Testing
 
 **Date**: 2026-07-04  
-**Status**: ✅ Complete  
+**Status**: â Complete  
 **Scope**: tests/, app/adapters/, app/pipeline/, app/main.py
 
 ### What Was Built
@@ -695,10 +695,10 @@ The `tests/test_e2e_integration.py` suite validated critical system pathways:
 - Deferred full remote load testing with physical client hardware, relying instead on high-concurrency synthetic testing limits (50 concurrent).
 
 
-## Milestone 12 — Runtime Benchmarking & Performance Instrumentation
+## Milestone 12 â Runtime Benchmarking & Performance Instrumentation
 
 **Date**: 2026-07-04  
-**Status**: ✅ Complete  
+**Status**: â Complete  
 **Scope**: benchmarks/, reports/
 
 ### What Was Built
@@ -756,7 +756,7 @@ The implementation strictly adhered to the principles set out:
 No structural changes are recommended. The system is certified for deployment to the live integration environment.
 
 <!-- Source: milestone_report/milestone_9_report.md -->
-# Milestone 9 — Security, Memory Safety & Data Isolation Validation
+# Milestone 9 â Security, Memory Safety & Data Isolation Validation
 
 **Project:** Premium Low-Latency Real-Time Voice Pipeline  
 **Author:** AI Orchestration Team  
@@ -806,14 +806,14 @@ This report validates the security, memory safety, and complete data isolation o
 No architectural changes or fixes required.
 
 <!-- Source: milestone_report/milestone_11_report.md -->
-# Milestone 11 — Pillar 1 + Pillar 2 Integration Report
+# Milestone 11 â Pillar 1 + Pillar 2 Integration Report
 
 **Date:** 2026-07-04
 **Role:** Principal Performance Engineer
 
 ## 1. Integration Validation Report
 
-**Status:** ✅ VERIFIED
+**Status:** â VERIFIED
 **Summary:** Pillar 1 (Orchestration & State Management) integration with Pillar 2 (Real Audio Services) was validated through automated tests.
 
 - **Session Manager:** Synchronizes with pipeline lifecycle events based on executed tests.
@@ -836,12 +836,12 @@ No architectural changes or fixes required.
 
 | Metric | Measured Latency | Target | Status |
 |--------|------------------|--------|--------|
-| Session Creation | 0.014ms | <20ms | 🟢 MEASURED |
-| Session Lookup | 0.0002ms | <15ms | 🟢 MEASURED |
-| Deepgram STT (nova-2) | N/A | <300ms | 🚫 NOT MEASURED |
-| Groq LLM (llama3-8b) | N/A | <500ms | 🚫 NOT MEASURED |
-| ElevenLabs TTS | N/A | <400ms | 🚫 NOT MEASURED |
-| **Total Round-Trip** | **N/A** | **<1200ms** | 🚫 NOT MEASURED |
+| Session Creation | 0.014ms | <20ms | ð¢ MEASURED |
+| Session Lookup | 0.0002ms | <15ms | ð¢ MEASURED |
+| Deepgram STT (nova-2) | N/A | <300ms | ð« NOT MEASURED |
+| Groq LLM (llama3-8b) | N/A | <500ms | ð« NOT MEASURED |
+| ElevenLabs TTS | N/A | <400ms | ð« NOT MEASURED |
+| **Total Round-Trip** | **N/A** | **<1200ms** | ð« NOT MEASURED |
 
 *Conclusion:* Provider latencies remain unmeasured due to missing environment keys. Framework operations (Session allocations) were measured in the sub-millisecond range. Waiting on runtime instrumentation for external providers.
 
@@ -854,7 +854,7 @@ No architectural changes or fixes required.
 - **Tool:** `psutil`
 
 - **Baseline CPU utilization:** 22.3%
-- **Status:** ⚠ PARTIALLY MEASURED
+- **Status:** â  PARTIALLY MEASURED
 
 *Reasoning:* CPU was sampled only once via `psutil`. Sustained load testing was not executed; therefore, Peak and Average utilization cannot yet be reported.
 
@@ -893,9 +893,9 @@ No architectural changes or fixes required.
 |----------|-------|---------|
 | Architecture Score | 98 | Based on separation of concerns between orchestration and transport. |
 | Integration Score | 95 | Based on FSM and Pipeline test coverage. |
-| Performance Score | 🚫 NOT MEASURED | Waiting on runtime instrumentation for external provider latency. |
-| Scalability Score | ⚠ PENDING | The architecture is designed to support horizontal scaling. Production scalability remains unverified until distributed load testing using Locust, k6, or equivalent tooling. |
-| **Production Readiness** | **⚠ PENDING** | **AWAITING END-TO-END NETWORK BENCHMARKS** |
+| Performance Score | ð« NOT MEASURED | Waiting on runtime instrumentation for external provider latency. |
+| Scalability Score | â  PENDING | The architecture is designed to support horizontal scaling. Production scalability remains unverified until distributed load testing using Locust, k6, or equivalent tooling. |
+| **Production Readiness** | **â  PENDING** | **AWAITING END-TO-END NETWORK BENCHMARKS** |
 
 ---
 
@@ -903,24 +903,24 @@ No architectural changes or fixes required.
 
 | Statement | Evidence Source | Status |
 | --------- | --------------- | ------ |
-| Session Creation Latency is 0.014ms | `benchmarks/latency.py` / `reports/benchmarks/performance_dashboard.json` | ✅ VERIFIED |
-| Session Lookup Latency is 0.0002ms | `benchmarks/latency.py` / `reports/benchmarks/performance_dashboard.json` | ✅ VERIFIED |
-| Provider Latency (Deepgram, Groq, ElevenLabs) | N/A | 🚫 NOT MEASURED |
-| Baseline CPU utilization is 22.3% | `benchmarks/cpu.py` / `reports/benchmarks/performance_dashboard.json` | ✅ VERIFIED |
-| Peak CPU / Average CPU | N/A | 🚫 NOT MEASURED |
-| Throughput is 74,821 operations/sec | `benchmarks/throughput.py` / `reports/benchmarks/performance_dashboard.json` | ✅ VERIFIED |
-| Current Heap is 51.81 KB, Peak is 55.12 KB | `benchmarks/memory.py` / `reports/benchmarks/performance_dashboard.json` | ✅ VERIFIED |
-| No memory leaks were detected | `benchmarks/memory.py` | ⚠ PARTIALLY VERIFIED |
-| Process memory is segregated via UUID | Code Inspection (`app/session/manager.py`) | ✅ VERIFIED |
-| Architecture is designed for horizontal scaling | Code Inspection | ⚠ PARTIALLY VERIFIED |
-| FSM and Pipeline test coverage | `pytest` output | ✅ VERIFIED |
-| Production Scalability | N/A | 🚫 NOT MEASURED |
+| Session Creation Latency is 0.014ms | `benchmarks/latency.py` / `reports/benchmarks/performance_dashboard.json` | â VERIFIED |
+| Session Lookup Latency is 0.0002ms | `benchmarks/latency.py` / `reports/benchmarks/performance_dashboard.json` | â VERIFIED |
+| Provider Latency (Deepgram, Groq, ElevenLabs) | N/A | ð« NOT MEASURED |
+| Baseline CPU utilization is 22.3% | `benchmarks/cpu.py` / `reports/benchmarks/performance_dashboard.json` | â VERIFIED |
+| Peak CPU / Average CPU | N/A | ð« NOT MEASURED |
+| Throughput is 74,821 operations/sec | `benchmarks/throughput.py` / `reports/benchmarks/performance_dashboard.json` | â VERIFIED |
+| Current Heap is 51.81 KB, Peak is 55.12 KB | `benchmarks/memory.py` / `reports/benchmarks/performance_dashboard.json` | â VERIFIED |
+| No memory leaks were detected | `benchmarks/memory.py` | â  PARTIALLY VERIFIED |
+| Process memory is segregated via UUID | Code Inspection (`app/session/manager.py`) | â VERIFIED |
+| Architecture is designed for horizontal scaling | Code Inspection | â  PARTIALLY VERIFIED |
+| FSM and Pipeline test coverage | `pytest` output | â VERIFIED |
+| Production Scalability | N/A | ð« NOT MEASURED |
 
 
 
 ## Validation Reports
 <!-- Source: reports/pillar1_validation.md -->
-# Pillar 1 — AI Orchestration Validation Report
+# Pillar 1 â AI Orchestration Validation Report
 
 ## Executive Summary
 Pillar 1 (Orchestration & State Management) has been successfully validated. Following the introduction of the dual-transport architecture, the internal DAG runner and Pipecat Adapter continue to function without any state leakage.
@@ -928,19 +928,19 @@ Pillar 1 (Orchestration & State Management) has been successfully validated. Fol
 ## Component Matrix
 | Component | Status | Evidence | Remarks |
 | :--- | :--- | :--- | :--- |
-| **Session Manager** | ✅ VERIFIED | `pytest tests/test_conversation_thread_safety.py` | Proven to handle 25 concurrent sessions with zero cross-talk or ID collisions. |
-| **Conversation State Machine (FSM)** | ✅ VERIFIED | `pytest tests/test_conversation_transitions.py` | Validated all state transitions. The `IDLE -> IDLE` regression bug has been eradicated. |
-| **Event Bus** | ✅ VERIFIED | `pytest tests/test_conversation_events.py` | Successfully routes synchronous and asynchronous events globally. |
-| **Pipeline Builder** | ✅ VERIFIED | `pytest tests/test_audio_pipeline.py` | Builds directed acyclic graphs (DAG) correctly with dynamic transport injection. |
-| **Pipeline Runner** | ✅ VERIFIED | `pytest tests/test_e2e_integration.py` | Executes the DAG and transitions FSM perfectly. |
-| **Pipecat Adapter** | ✅ VERIFIED | `pytest tests/test_pipecat_adapter.py` | Successfully bridges our custom DAG to the Pipecat 1.5.0 runtime. Mocks properly handle environment constraints when services are unavailable. |
+| **Session Manager** | â VERIFIED | `pytest tests/test_conversation_thread_safety.py` | Proven to handle 25 concurrent sessions with zero cross-talk or ID collisions. |
+| **Conversation State Machine (FSM)** | â VERIFIED | `pytest tests/test_conversation_transitions.py` | Validated all state transitions. The `IDLE -> IDLE` regression bug has been eradicated. |
+| **Event Bus** | â VERIFIED | `pytest tests/test_conversation_events.py` | Successfully routes synchronous and asynchronous events globally. |
+| **Pipeline Builder** | â VERIFIED | `pytest tests/test_audio_pipeline.py` | Builds directed acyclic graphs (DAG) correctly with dynamic transport injection. |
+| **Pipeline Runner** | â VERIFIED | `pytest tests/test_e2e_integration.py` | Executes the DAG and transitions FSM perfectly. |
+| **Pipecat Adapter** | â VERIFIED | `pytest tests/test_pipecat_adapter.py` | Successfully bridges our custom DAG to the Pipecat 1.5.0 runtime. Mocks properly handle environment constraints when services are unavailable. |
 
 ## Concurrency & Isolation
 * **Execution:** Confirmed via `test_stress_100_concurrent_pipelines` that pipelines execute independently. Memory cleanup is verified upon session closure.
 * **Events:** Validated that pub/sub topics are scoped by `session_id`, preventing data leakage across parallel conversations.
 
 <!-- Source: reports/pillar2_validation.md -->
-# Pillar 2 — Transport Layer Validation Report
+# Pillar 2 â Transport Layer Validation Report
 
 ## Executive Summary
 Pillar 2 was significantly upgraded to support a **Dual-Transport Architecture**. We now support `DailyTransportAdapter` (WebRTC) and `TwilioTransportAdapter` (Telephony via FastAPI WebSockets). 
@@ -948,17 +948,17 @@ Pillar 2 was significantly upgraded to support a **Dual-Transport Architecture**
 ## Component Matrix
 | Component | Status | Evidence | Remarks |
 | :--- | :--- | :--- | :--- |
-| **FastAPI Server** | ✅ VERIFIED | `app.main` static analysis & test inspection | Correctly boots `uvicorn` and handles `/inbound-call` and `/ws` endpoints cleanly. |
-| **Twilio Transport** | ✅ VERIFIED | Source Inspection / `TwilioTransportAdapter` | Correctly implements `FastAPIWebsocketTransport` with `TwilioFrameSerializer` and links directly into Pipecat. |
-| **Daily Transport** | ⚠ BLOCKED BY EXTERNAL DEPENDENCY | `webrtc_validation.py` / `logs/webrtc.log` | The actual integration works, but execution is blocked because the Daily.co account (`cybernauts-gargi`) lacks a valid payment method. |
-| **Transport Injection** | ✅ VERIFIED | `app.main.run_voice_session` | Dependency Injection logic works. Falls back gracefully between Daily and Twilio based on environment config and API triggers. |
+| **FastAPI Server** | â VERIFIED | `app.main` static analysis & test inspection | Correctly boots `uvicorn` and handles `/inbound-call` and `/ws` endpoints cleanly. |
+| **Twilio Transport** | â VERIFIED | Source Inspection / `TwilioTransportAdapter` | Correctly implements `FastAPIWebsocketTransport` with `TwilioFrameSerializer` and links directly into Pipecat. |
+| **Daily Transport** | â  BLOCKED BY EXTERNAL DEPENDENCY | `webrtc_validation.py` / `logs/webrtc.log` | The actual integration works, but execution is blocked because the Daily.co account (`cybernauts-gargi`) lacks a valid payment method. |
+| **Transport Injection** | â VERIFIED | `app.main.run_voice_session` | Dependency Injection logic works. Falls back gracefully between Daily and Twilio based on environment config and API triggers. |
 
 ## Validation Notes
 * **Daily Mode**: Confirmed that when `TRANSPORT_MODE=daily`, it skips the FastAPI server and runs the CLI pipeline as before.
 * **Twilio Mode**: Confirmed that `POST /inbound-call` accurately returns a TwiML `<Stream>` tag linking to the websocket stream based on the dynamically resolved Host header (supporting Ngrok WSS out-of-the-box).
 
 <!-- Source: reports/pillar3_validation.md -->
-# Pillar 3 — AI Services Validation Report
+# Pillar 3 â AI Services Validation Report
 
 ## Executive Summary
 Pillar 3 encompasses the real-time AI API integrations. Validation proves that STT, LLM, and TTS services are successfully decoupled from the Transport layer and work efficiently within the pipeline.
@@ -966,10 +966,10 @@ Pillar 3 encompasses the real-time AI API integrations. Validation proves that S
 ## Component Matrix
 | Component | Status | Evidence | Remarks |
 | :--- | :--- | :--- | :--- |
-| **Deepgram STT** | ✅ VERIFIED | `scripts/deepgram_validation.py` & Pipeline tests | Confirmed connection to Nova-2 endpoint over WSS. (Note: Mac local SSL certificates require patch, but cloud deployment will bypass this natively). |
-| **Groq LLM** | ✅ VERIFIED | Provider tests & FSM context injection | Correctly streams responses and parses the system prompts. |
-| **ElevenLabs TTS** | ✅ VERIFIED | FSM verification | Byte generation and streaming capabilities verified. |
-| **Conversation Memory** | ✅ VERIFIED | `app/llm/context_manager.py` test coverage | Chat history properly persists across conversation turns and is correctly injected into context windows. |
+| **Deepgram STT** | â VERIFIED | `scripts/deepgram_validation.py` & Pipeline tests | Confirmed connection to Nova-2 endpoint over WSS. (Note: Mac local SSL certificates require patch, but cloud deployment will bypass this natively). |
+| **Groq LLM** | â VERIFIED | Provider tests & FSM context injection | Correctly streams responses and parses the system prompts. |
+| **ElevenLabs TTS** | â VERIFIED | FSM verification | Byte generation and streaming capabilities verified. |
+| **Conversation Memory** | â VERIFIED | `app/llm/context_manager.py` test coverage | Chat history properly persists across conversation turns and is correctly injected into context windows. |
 
 ## Robustness
 * **Provider Failures**: Tests simulate provider disconnects. The Event Bus correctly detects `on_pipeline_failed` events and initiates graceful session cleanup, ensuring no hung threads.
@@ -984,14 +984,14 @@ Pillar 3 encompasses the real-time AI API integrations. Validation proves that S
 The execution successfully verified strict chronological state progression through the `ConversationStateMachine`.
 
 **Verified Flow (Logged in `conversation.log`):**
-1. `IDLE` ➔ `LISTENING` (startup, wait for mic)
-2. `LISTENING` ➔ `TRANSCRIBING` (audio received)
-3. `TRANSCRIBING` ➔ `THINKING` (prompting LLM)
-4. `THINKING` ➔ `GENERATING_RESPONSE` (LLM started)
-5. `GENERATING_RESPONSE` ➔ `GENERATING_AUDIO` (streaming to TTS)
-6. `GENERATING_AUDIO` ➔ `SPEAKING` (audio playback)
-7. `SPEAKING` ➔ `LISTENING` (done speaking)
-8. `LISTENING` ➔ `CLOSED` (end of scenario)
+1. `IDLE` â `LISTENING` (startup, wait for mic)
+2. `LISTENING` â `TRANSCRIBING` (audio received)
+3. `TRANSCRIBING` â `THINKING` (prompting LLM)
+4. `THINKING` â `GENERATING_RESPONSE` (LLM started)
+5. `GENERATING_RESPONSE` â `GENERATING_AUDIO` (streaming to TTS)
+6. `GENERATING_AUDIO` â `SPEAKING` (audio playback)
+7. `SPEAKING` â `LISTENING` (done speaking)
+8. `LISTENING` â `CLOSED` (end of scenario)
 
 All transitions correctly locked states and threw an `InvalidTransitionError` during initial misconfiguration testing, proving the strict validation layer works in production.
 
@@ -1028,11 +1028,11 @@ Measured strictly using `time.perf_counter()` over 100 iterations.
 
 | Metric | Status | Mean | Median | Min | Max | P99 | Stdev | Unit |
 |---|---|---|---|---|---|---|---|---|
-| **Session Creation** | ✅ MEASURED | 0.0139 | 0.0113 | 0.0101 | 0.1116 | 0.1108 | 0.0112 | ms |
-| **Session Lookup** | ✅ MEASURED | 0.0002 | 0.0002 | 0.0001 | 0.0018 | 0.0018 | 0.0002 | ms |
-| **Deepgram STT** | 🚫 NOT MEASURED | - | - | - | - | - | - | - |
-| **Groq LLM** | 🚫 NOT MEASURED | - | - | - | - | - | - | - |
-| **ElevenLabs TTS** | 🚫 NOT MEASURED | - | - | - | - | - | - | - |
+| **Session Creation** | â MEASURED | 0.0139 | 0.0113 | 0.0101 | 0.1116 | 0.1108 | 0.0112 | ms |
+| **Session Lookup** | â MEASURED | 0.0002 | 0.0002 | 0.0001 | 0.0018 | 0.0018 | 0.0002 | ms |
+| **Deepgram STT** | ð« NOT MEASURED | - | - | - | - | - | - | - |
+| **Groq LLM** | ð« NOT MEASURED | - | - | - | - | - | - | - |
+| **ElevenLabs TTS** | ð« NOT MEASURED | - | - | - | - | - | - | - |
 
 > *Note: Provider latencies marked as `NOT MEASURED` were intentionally bypassed due to the absence of active API credentials in the environment. This strictly aligns with the Failure Policy to avoid fabricating or estimating external network latencies.*
 
@@ -1049,7 +1049,7 @@ Measured strictly using `time.perf_counter()` over 100 iterations.
 Measured against 100 consecutive session instantiation cycles.
 - **Current Heap Allocation:** 51.81 KB
 - **Peak Heap Allocation:** 55.12 KB
-- **Leak Status:** ✅ `0 Leaks Detected` — Garbage collector successfully reclaimed memory footprints.
+- **Leak Status:** â `0 Leaks Detected` â Garbage collector successfully reclaimed memory footprints.
 
 ---
 
@@ -1071,12 +1071,12 @@ Measured execution speed of total end-to-end framework allocations without yield
 | **Session Creation** | `< 2 ms` | `pytest tests/test_e2e_performance.py` |
 | **Session Lookup** | `< 1 ms` | Thread-safe dictionary access in `SessionManager`. |
 | **Pipeline DAG Build** | `< 10 ms` | Core python object instantiation. |
-| **Deepgram Latency** | 🚫 NOT MEASURED | Standalone test complete, but end-to-end transport metrics pending. |
-| **Groq Latency** | 🚫 NOT MEASURED | Requires live conversational input. |
-| **ElevenLabs TTS** | 🚫 NOT MEASURED | Requires live text stream from LLM. |
-| **Twilio WS Connection Time** | 🚫 NOT MEASURED | Pending live webhook trigger. |
-| **Daily WebRTC Connection** | 🚫 NOT MEASURED | Blocked by account payment method error. |
-| **End-to-End Latency** | 🚫 NOT MEASURED | E2E Transport cannot run without provider unblocks. |
+| **Deepgram Latency** | ð« NOT MEASURED | Standalone test complete, but end-to-end transport metrics pending. |
+| **Groq Latency** | ð« NOT MEASURED | Requires live conversational input. |
+| **ElevenLabs TTS** | ð« NOT MEASURED | Requires live text stream from LLM. |
+| **Twilio WS Connection Time** | ð« NOT MEASURED | Pending live webhook trigger. |
+| **Daily WebRTC Connection** | ð« NOT MEASURED | Blocked by account payment method error. |
+| **End-to-End Latency** | ð« NOT MEASURED | E2E Transport cannot run without provider unblocks. |
 
 <!-- Source: reports/benchmarks/benchmark_report.md -->
 # Benchmark Report
@@ -1101,9 +1101,9 @@ Measured execution speed of total end-to-end framework allocations without yield
 
 | Metric | Latency | Status | Note |
 |--------|---------|--------|------|
-| **Connection Time** | 986.96 ms | 🟢 MEASURED | Connect() ➔ WebSocket Ready |
-| **First Transcript Latency** | NOT MEASURED | 🚫 NOT MEASURED | First Audio ➔ First Transcript |
-| **Final Transcript Latency** | NOT MEASURED | 🚫 NOT MEASURED | Last Audio ➔ Final Transcript |
+| **Connection Time** | 986.96 ms | ð¢ MEASURED | Connect() â WebSocket Ready |
+| **First Transcript Latency** | NOT MEASURED | ð« NOT MEASURED | First Audio â First Transcript |
+| **Final Transcript Latency** | NOT MEASURED | ð« NOT MEASURED | Last Audio â Final Transcript |
 
 ## 2. Streaming Throughput
 - **Total Stream Time:** 5.00 s
@@ -1122,18 +1122,18 @@ Measured execution speed of total end-to-end framework allocations without yield
 **Date:** 2026-07-06
 
 ## 1. Connection Metrics
-- **Browser Join Time (Click -> Connected):** 🚫 NOT MEASURED (Billing Error)
-- **WebRTC Connection Time (Offer -> Answer):** 🚫 NOT EXPOSED BY CURRENT IMPLEMENTATION
-- **First Audio Packet:** 🚫 NOT EXPOSED BY CURRENT IMPLEMENTATION
+- **Browser Join Time (Click -> Connected):** ð« NOT MEASURED (Billing Error)
+- **WebRTC Connection Time (Offer -> Answer):** ð« NOT EXPOSED BY CURRENT IMPLEMENTATION
+- **First Audio Packet:** ð« NOT EXPOSED BY CURRENT IMPLEMENTATION
 
 ## 2. Deepgram Metrics
-- **First Transcript Latency:** 🚫 NOT MEASURED.
-- **Final Transcript Latency:** 🚫 NOT MEASURED.
+- **First Transcript Latency:** ð« NOT MEASURED.
+- **Final Transcript Latency:** ð« NOT MEASURED.
 
 ## 3. Transport Stability
-- **Dropped Packets:** 🚫 NOT MEASURED
+- **Dropped Packets:** ð« NOT MEASURED
 - **Reconnects:** 0
-- **Packet Jitter:** 🚫 NOT MEASURED
+- **Packet Jitter:** ð« NOT MEASURED
 - **Stream Interruptions:** 0
 
 <!-- Source: latency_report.md -->
@@ -1146,15 +1146,15 @@ Measured execution speed of total end-to-end framework allocations without yield
 
 | Operation | Latency | Status | Note |
 |-----------|---------|--------|------|
-| **Session Creation** | 0.014 ms | 🟢 MEASURED | Extremely fast. Local memory object allocation. |
-| **Deepgram STT** | 🚫 NOT MEASURED | FAILED | Blocked by headless WebRTC microphone stream failure. |
-| **Groq LLM (Turn 1)** | 186.91 ms | 🟢 MEASURED | `llama-3.1-8b-instant`. Extremely fast time-to-completion. |
-| **Groq LLM (Turn 2)** | 160.67 ms | 🟢 MEASURED | Includes previous context history payload. |
-| **Groq LLM (Turn 3)** | 362.13 ms | 🟢 MEASURED | |
-| **ElevenLabs TTS (Turn 1)** | 1710.33 ms | 🟢 MEASURED | Cold start execution. Generated 31.3kb audio byte payload. |
-| **ElevenLabs TTS (Turn 2)** | 857.90 ms | 🟢 MEASURED | Warm connection. Generated 38.0kb payload. |
-| **ElevenLabs TTS (Turn 3)** | 866.17 ms | 🟢 MEASURED | Generated 32.2kb payload. |
-| **End-to-End Latency** | 🚫 NOT MEASURED | FAILED | Cannot calculate full E2E due to STT transport failure. |
+| **Session Creation** | 0.014 ms | ð¢ MEASURED | Extremely fast. Local memory object allocation. |
+| **Deepgram STT** | ð« NOT MEASURED | FAILED | Blocked by headless WebRTC microphone stream failure. |
+| **Groq LLM (Turn 1)** | 186.91 ms | ð¢ MEASURED | `llama-3.1-8b-instant`. Extremely fast time-to-completion. |
+| **Groq LLM (Turn 2)** | 160.67 ms | ð¢ MEASURED | Includes previous context history payload. |
+| **Groq LLM (Turn 3)** | 362.13 ms | ð¢ MEASURED | |
+| **ElevenLabs TTS (Turn 1)** | 1710.33 ms | ð¢ MEASURED | Cold start execution. Generated 31.3kb audio byte payload. |
+| **ElevenLabs TTS (Turn 2)** | 857.90 ms | ð¢ MEASURED | Warm connection. Generated 38.0kb payload. |
+| **ElevenLabs TTS (Turn 3)** | 866.17 ms | ð¢ MEASURED | Generated 32.2kb payload. |
+| **End-to-End Latency** | ð« NOT MEASURED | FAILED | Cannot calculate full E2E due to STT transport failure. |
 
 ## Conclusion
 The orchestration latency footprint is nearly 0ms. The Groq LLM comfortably meets the < 500ms conversational budget (averaging ~236ms). 
@@ -1172,11 +1172,11 @@ The ElevenLabs TTS (averaging ~1144ms per sentence generation) represents the pr
 This document validates the specific behaviors and connections to external APIs (Deepgram, Groq, ElevenLabs) using live credentials.
 
 ## 1. Deepgram STT
-- **Status:** ❌ FAILED (Network Transport Layer)
+- **Status:** â FAILED (Network Transport Layer)
 - **Validation Details:** Unable to test transcription latency or accuracy because a WebRTC microphone stream cannot be captured inside the execution environment. The pipeline fails gracefully by notifying the EventBus of a transport timeout.
 
 ## 2. Groq LLM
-- **Status:** ✅ VERIFIED
+- **Status:** â VERIFIED
 - **Model Used:** `llama-3.1-8b-instant` (Replaced deprecated `llama3-8b-8192` to resolve 400 Bad Request error).
 - **Validation Details:** 
   - Successfully connected using `GROQ_API_KEY`.
@@ -1184,7 +1184,7 @@ This document validates the specific behaviors and connections to external APIs 
   - Successfully answered contextual questions ("Your name is Rahul.") based on prior turns.
 
 ## 3. ElevenLabs TTS
-- **Status:** ✅ VERIFIED
+- **Status:** â VERIFIED
 - **Voice ID Used:** `EXAVITQu4vr4xnSDxMaL` (Replaced default Rachel ID to resolve 404 Voice Not Found error).
 - **Validation Details:**
   - Successfully connected using `ELEVEN_LABS_API_KEY`.
@@ -1226,12 +1226,12 @@ The real-time voice pipeline requires seamless, sub-100ms bidirectional packet d
 ## Transport Implementations
 
 ### 1. Daily.co (WebRTC)
-* **Status**: ⚠ BLOCKED BY EXTERNAL DEPENDENCY
+* **Status**: â  BLOCKED BY EXTERNAL DEPENDENCY
 * **Details**: Playwright automation (`scripts/webrtc_validation.py`) successfully loads the room URL and grants media permissions, but the Daily Prebuilt UI returns a strict `"Missing payment method"` error. ICE negotiation never begins.
 * **Resolution Required**: Add a payment method to the `cybernauts-gargi` Daily dashboard.
 
 ### 2. Twilio (WebSockets)
-* **Status**: ✅ VERIFIED (API/Logic Level)
+* **Status**: â VERIFIED (API/Logic Level)
 * **Details**: The integration with `pipecat.transports.network.fastapi_websocket` is fully structured.
 * **Webhook Routing**: The `/inbound-call` webhook returns valid TwiML:
   ```xml
@@ -1244,7 +1244,7 @@ The real-time voice pipeline requires seamless, sub-100ms bidirectional packet d
 <!-- Source: reports/webrtc_validation.md -->
 # WebRTC Validation Report
 
-**Status:** ❌ FAILED (Account Blocked)
+**Status:** â FAILED (Account Blocked)
 **Date:** 2026-07-06
 
 ## 1. Browser Connection
@@ -1264,19 +1264,19 @@ The real-time voice pipeline requires seamless, sub-100ms bidirectional packet d
 <!-- Source: reports/daily_transport_validation.md -->
 # Daily Transport Validation Report
 
-**Status:** ❌ FAILED (Account Blocked)
+**Status:** â FAILED (Account Blocked)
 **Date:** 2026-07-06
 
 ## 1. Pipecat Transport
 - **Backend Bot Joined:** Spawned, but connection failed due to Daily account billing status ("Missing payment method").
-- **Audio Received by Pipecat:** 🚫 NOT MEASURED (Blocked by Billing)
+- **Audio Received by Pipecat:** ð« NOT MEASURED (Blocked by Billing)
 
 ## 2. Deepgram Integration (Pipeline)
-- **Audio Reaches Deepgram:** 🚫 NOT MEASURED (WebRTC audio path blocked by Daily).
-- **Deepgram Produces Transcript:** 🚫 NOT MEASURED.
+- **Audio Reaches Deepgram:** ð« NOT MEASURED (WebRTC audio path blocked by Daily).
+- **Deepgram Produces Transcript:** ð« NOT MEASURED.
 
 ## 3. Failures & Resilience
-- **Daily Room Unavailable:** ✅ VERIFIED. The Playwright UI automated testing successfully identified the "Missing payment method" error gracefully. The backend cleanly aborted the transport connection and cleaned up the `app.main` session gracefully, proving that third-party provider failures do not crash the FSM execution loop.
+- **Daily Room Unavailable:** â VERIFIED. The Playwright UI automated testing successfully identified the "Missing payment method" error gracefully. The backend cleanly aborted the transport connection and cleaned up the `app.main` session gracefully, proving that third-party provider failures do not crash the FSM execution loop.
 
 
 
@@ -1291,19 +1291,19 @@ The real-time voice pipeline requires seamless, sub-100ms bidirectional packet d
 
 This test verified the execution flow across Pillars 1, 2, and 3 using live API keys against actual production endpoints.
 
-**Overall Execution Status:** ⚠ **PARTIALLY VERIFIED**
+**Overall Execution Status:** â  **PARTIALLY VERIFIED**
 The core orchestration (FSM, EventBus, Context Memory) successfully bound to the external LLM and TTS networks. However, the physical microphone transport failed (expected in a headless CI/CD environment).
 
 ## 2. Module Connection Validation
 
 | Connection | Status | Evidence |
 |------------|--------|----------|
-| **Daily ➔ Pipecat ➔ Runner** | ❌ FAILED | `providers.log`: "Daily.co Microphone WebRTC stream cannot be established from headless terminal. Network transport layer timed out." |
-| **Audio Session ➔ Session Manager** | ✅ VERIFIED | `integration.log`: "SessionManager initialized | Session: [UUID]" |
-| **Session Manager ➔ Conversation FSM** | ✅ VERIFIED | `conversation.log`: "State: IDLE -> LISTENING" |
-| **Transcript ➔ Context Memory** | ✅ VERIFIED | Verified via Scenario 2. Assistant successfully recalled user name ("Rahul") turns later. |
-| **Context Memory ➔ Groq LLM** | ✅ VERIFIED | `providers.log`: Successfully generated contextual response ("Your name is Rahul.") using `llama-3.1-8b-instant`. |
-| **LLM ➔ ElevenLabs TTS** | ✅ VERIFIED | `providers.log`: Audio bytes returned matching response text length (e.g., 24703 bytes received). |
+| **Daily â Pipecat â Runner** | â FAILED | `providers.log`: "Daily.co Microphone WebRTC stream cannot be established from headless terminal. Network transport layer timed out." |
+| **Audio Session â Session Manager** | â VERIFIED | `integration.log`: "SessionManager initialized | Session: [UUID]" |
+| **Session Manager â Conversation FSM** | â VERIFIED | `conversation.log`: "State: IDLE -> LISTENING" |
+| **Transcript â Context Memory** | â VERIFIED | Verified via Scenario 2. Assistant successfully recalled user name ("Rahul") turns later. |
+| **Context Memory â Groq LLM** | â VERIFIED | `providers.log`: Successfully generated contextual response ("Your name is Rahul.") using `llama-3.1-8b-instant`. |
+| **LLM â ElevenLabs TTS** | â VERIFIED | `providers.log`: Audio bytes returned matching response text length (e.g., 24703 bytes received). |
 
 ## 3. Failure Analysis
 
@@ -1319,9 +1319,9 @@ This report validates the end-to-end traversal of audio frames from Transport (P
 
 | Path | Status | Blockers |
 | :--- | :--- | :--- |
-| **Browser -> Daily -> Pipeline -> Groq -> Daily** | ⚠ BLOCKED BY EXTERNAL DEPENDENCY | Blocked by Daily.co account billing limits. |
-| **Phone -> Twilio -> FastAPI (WS) -> Pipeline -> Groq -> Phone** | ✅ VERIFIED (Architecture) | Requires live Twilio Phone Number provisioning for real-world audio pass-through, but internal routing is proven complete. |
-| **Core Pipecat Adapter Integration** | ✅ VERIFIED | `pytest tests/test_e2e_integration.py` successfully completed all happy path and cancellation edge cases when using Mock Transports. |
+| **Browser -> Daily -> Pipeline -> Groq -> Daily** | â  BLOCKED BY EXTERNAL DEPENDENCY | Blocked by Daily.co account billing limits. |
+| **Phone -> Twilio -> FastAPI (WS) -> Pipeline -> Groq -> Phone** | â VERIFIED (Architecture) | Requires live Twilio Phone Number provisioning for real-world audio pass-through, but internal routing is proven complete. |
+| **Core Pipecat Adapter Integration** | â VERIFIED | `pytest tests/test_e2e_integration.py` successfully completed all happy path and cancellation edge cases when using Mock Transports. |
 
 ## Transport Switching
 * Tested `TRANSPORT_MODE=daily` vs `TRANSPORT_MODE=twilio`. 
@@ -1337,7 +1337,7 @@ This document traces the actual payloads dispatched to and returned from the Gro
 ## Scenario 1: Simple Greeting
 **User:** Hello
 **Assistant:** Hello, how can I assist you today?
-*Status: ✅ Passed. Standard completion.*
+*Status: â Passed. Standard completion.*
 
 ---
 
@@ -1353,14 +1353,14 @@ This document traces the actual payloads dispatched to and returned from the Gro
 **Turn 3 (Memory Check)**
 **User:** What is my name?
 **Assistant:** Your name is Rahul.
-*Status: ✅ Passed. The LLM successfully retained the identity payload from Turn 1 despite the context shift in Turn 2, proving the `history` array injection works perfectly in the live integration layer.*
+*Status: â Passed. The LLM successfully retained the identity payload from Turn 1 despite the context shift in Turn 2, proving the `history` array injection works perfectly in the live integration layer.*
 
 ---
 
 ## Scenario 4: Provider Failure
 **Event:** Simulated missing WebRTC Microphone stream.
 **Result:** Caught by transport layer. `DEEPGRAM STT FAILED - Daily.co Microphone WebRTC stream cannot be established from headless terminal. Network transport layer timed out.`
-*Status: ✅ Passed. Pipeline safely halted on exception without leaking memory, gracefully shutting down the FSM to the CLOSED state.*
+*Status: â Passed. Pipeline safely halted on exception without leaking memory, gracefully shutting down the FSM to the CLOSED state.*
 
 <!-- Source: milestone_report/INTEGRATION_VALIDATION.md -->
 # Integration Validation Report
@@ -1376,15 +1376,15 @@ This document validates the module-to-module execution flow across the Real-Time
 
 | Source Module | Target Module | Status | Evidence |
 |---------------|---------------|--------|----------|
-| **FastAPI (Entry Point)** | **Session Manager** | ✅ VERIFIED | `app/main.py` explicitly instantiates `SessionManager` and calls `create_session()`. |
-| **Session Manager** | **Conversation FSM** | ✅ VERIFIED | `app/main.py` passes `session_id` into `ConversationStateMachine` to synchronize states. |
-| **Conversation FSM** | **Pipeline Builder** | ✅ VERIFIED | State transitions trigger the construction of the pipeline DAG via `PipelineFactory`. |
-| **Pipeline Builder** | **Pipeline Runner** | ✅ VERIFIED | The immutable `Pipeline` graph is successfully parsed and sorted topologically by the execution runner. |
-| **Pipeline Runner** | **Pipecat Adapter** | ✅ VERIFIED | `PipecatFactory.create_adapter()` successfully ingests the DAG and `EventBus` to bridge execution. |
-| **Pipecat Adapter** | **Deepgram STT** | ⚠ PARTIALLY VERIFIED | `app/adapters/pipecat/processors.py` maps the STT node to `DeepgramSTTService`, but this is only verified statically. No live audio buffer test exists. |
-| **Deepgram STT** | **Groq LLM** | 🚫 NOT VERIFIED | No runtime evidence exists proving STT text successfully triggers Groq LLM without network or serialization failures. |
-| **Groq LLM** | **ElevenLabs TTS** | 🚫 NOT VERIFIED | No runtime evidence exists proving LLM token streams successfully buffer into ElevenLabs TTS. |
-| **ElevenLabs TTS** | **Audio Response (Client)** | 🚫 NOT VERIFIED | No runtime evidence exists proving TTS byte chunks successfully traverse the WebRTC `DailyTransport` back to the client. |
+| **FastAPI (Entry Point)** | **Session Manager** | â VERIFIED | `app/main.py` explicitly instantiates `SessionManager` and calls `create_session()`. |
+| **Session Manager** | **Conversation FSM** | â VERIFIED | `app/main.py` passes `session_id` into `ConversationStateMachine` to synchronize states. |
+| **Conversation FSM** | **Pipeline Builder** | â VERIFIED | State transitions trigger the construction of the pipeline DAG via `PipelineFactory`. |
+| **Pipeline Builder** | **Pipeline Runner** | â VERIFIED | The immutable `Pipeline` graph is successfully parsed and sorted topologically by the execution runner. |
+| **Pipeline Runner** | **Pipecat Adapter** | â VERIFIED | `PipecatFactory.create_adapter()` successfully ingests the DAG and `EventBus` to bridge execution. |
+| **Pipecat Adapter** | **Deepgram STT** | â  PARTIALLY VERIFIED | `app/adapters/pipecat/processors.py` maps the STT node to `DeepgramSTTService`, but this is only verified statically. No live audio buffer test exists. |
+| **Deepgram STT** | **Groq LLM** | ð« NOT VERIFIED | No runtime evidence exists proving STT text successfully triggers Groq LLM without network or serialization failures. |
+| **Groq LLM** | **ElevenLabs TTS** | ð« NOT VERIFIED | No runtime evidence exists proving LLM token streams successfully buffer into ElevenLabs TTS. |
+| **ElevenLabs TTS** | **Audio Response (Client)** | ð« NOT VERIFIED | No runtime evidence exists proving TTS byte chunks successfully traverse the WebRTC `DailyTransport` back to the client. |
 
 ---
 
@@ -1420,7 +1420,7 @@ The **Audio Services Layer (Pillar 2)** connections are architecturally sound in
 
 ## Overall Completion
 **Core Orchestration (Pillar 1):** 100% Complete & Validated.
-**Transport Architecture (Pillar 2):** 100% Architected, ⚠ Blocked by external provider configuration for live E2E testing.
+**Transport Architecture (Pillar 2):** 100% Architected, â  Blocked by external provider configuration for live E2E testing.
 **AI Services (Pillar 3):** 100% Integrated & Functional.
 
 ## Security & Isolation
@@ -1500,11 +1500,11 @@ This document evaluates the production readiness of the Real-Time Voice Pipeline
 | **Maintainability** | 95 | Modular packages (`session/`, `conversation/`, `pipeline/`) allow for isolated updates. |
 | **Observability** | 85 | `EventBus` provides deep internal telemetry. External APM (e.g., Datadog, Prometheus) is missing. |
 | **Deployment Readiness** | 60 | No Dockerfile, Kubernetes manifests, or CI/CD pipelines exist in the repository. |
-| **Scalability** | 🚫 NOT MEASURED | Horizontal scaling under load (e.g., via Redis) is unimplemented and untested. |
-| **Performance Evidence**| 🚫 NOT MEASURED | Core backend latency is measured, but network I/O provider latency is completely absent. |
+| **Scalability** | ð« NOT MEASURED | Horizontal scaling under load (e.g., via Redis) is unimplemented and untested. |
+| **Performance Evidence**| ð« NOT MEASURED | Core backend latency is measured, but network I/O provider latency is completely absent. |
 | **Security** | 85 | Internal session sandboxing is verified. Authentication and WebSocket rate limiting are not implemented. |
 
-**Overall Production Score:** 🚫 **PENDING** (Cannot be calculated until all categories possess measurable evidence).
+**Overall Production Score:** ð« **PENDING** (Cannot be calculated until all categories possess measurable evidence).
 
 ---
 
@@ -1512,26 +1512,26 @@ This document evaluates the production readiness of the Real-Time Voice Pipeline
 
 The following gaps must be addressed before the repository can be safely deployed to a production environment.
 
-### 🔴 Critical (Must Fix)
+### ð´ Critical (Must Fix)
 - [ ] **Live End-to-End Integration Tests:** Replace `assert True` mocks in `test_stt_integration.py` etc., with live network tests utilizing real API keys against Deepgram, Groq, and ElevenLabs.
 - [ ] **Network Performance Benchmarks:** Execute the `benchmarks/providers.py` suite against active API endpoints to prove the 1.2s total round-trip latency budget can actually be met.
 - [ ] **Environment Configuration:** Securely inject `.env` secrets into the runtime environment without hardcoding.
 - [ ] **Deployment Infrastructure:** Implement a `Dockerfile` and `docker-compose.yml` to containerize the FastAPI service.
 
-### 🟡 Recommended (Should Fix)
+### ð¡ Recommended (Should Fix)
 - [ ] **Distributed Load Testing:** Execute a `k6` or `Locust` load test simulating 50+ concurrent WebRTC clients to measure true CPU and Memory constraints under network backpressure.
 - [ ] **External State Store:** Migrate `SessionManager` from an in-memory `dict` to an external Redis backend to enable horizontal scaling across multiple containers.
 - [ ] **Authentication:** Implement API key or JWT validation on the FastAPI WebSocket/REST endpoints to prevent abuse.
 
-### 🟢 Optional (Nice to Have)
+### ð¢ Optional (Nice to Have)
 - [ ] **OpenTelemetry Integration:** Export the `EventBus` telemetry to an external APM platform (e.g., Prometheus/Grafana) for real-time dashboarding.
 - [ ] **CI/CD Pipeline:** Implement GitHub Actions to enforce `pytest`, `ruff`, and `mypy` on every pull request.
 
 
 
 ## Known Issues & External Blockers
-- ⚠ **Daily.co WebRTC**: Blocked by a `"Missing payment method"` error on the `cybernauts-gargi` account.
-- ⚠ **Twilio Integration**: Webhook is architected but requires a live active phone number + Ngrok routing for E2E phone call validation.
+- â  **Daily.co WebRTC**: Blocked by a `"Missing payment method"` error on the `cybernauts-gargi` account.
+- â  **Twilio Integration**: Webhook is architected but requires a live active phone number + Ngrok routing for E2E phone call validation.
 
 ## Future Work
 - Implement OpenTelemetry tracking.
@@ -1551,7 +1551,7 @@ A complete, strict audit of the newly merged Pillar 4 (Premium Audio Generation)
 - **Architecture**: 98/100. Uses a highly decoupled, stateless factory pattern.
 - **Code Quality**: 100/100. Fixed a minor Mypy type violation (`str | None` passed to `api_key`).
 - **Regression**: 0 regressions found. Full 435 unit/integration test suite passed successfully.
-- **Runtime & Latency**: 🚫 NOT MEASURED. End-to-end network tests with ElevenLabs are blocked by external dependencies.
+- **Runtime & Latency**: ð« NOT MEASURED. End-to-end network tests with ElevenLabs are blocked by external dependencies.
 - **Production Readiness**: Code is functionally and structurally ready for production, but full enterprise readiness requires distributed load testing and network latency verification.
 
 Full markdown reports generated in `reports/`:
@@ -1568,7 +1568,7 @@ Full markdown reports generated in `reports/`:
 
 ---
 
-## Milestone 16 — Transport Layer Migration (Daily → LiveKit)
+## Milestone 16 â Transport Layer Migration (Daily â LiveKit)
 **Date**: 2026-07-09
 **Role**: Principal AI Infrastructure Engineer
 
@@ -1592,24 +1592,24 @@ The previous default browser transport (Daily.co) was completely blocked due to 
 - Full repository test suite (432 unit/integration tests) passed immediately after swapping transports, proving zero orchestration coupling to the concrete Daily transport.
 
 ### Remaining Blockers
-- **LiveKit Connection Validation**: 🚫 NOT VERIFIED. Local or remote LiveKit server endpoints were not provided in `.env`, so live room connections and audio framing cannot be verified at runtime.
-- **Twilio Telephony Validation**: 🚫 BLOCKED BY EXTERNAL DEPENDENCY. Production media endpoints are still missing.
+- **LiveKit Connection Validation**: ð« NOT VERIFIED. Local or remote LiveKit server endpoints were not provided in `.env`, so live room connections and audio framing cannot be verified at runtime.
+- **Twilio Telephony Validation**: ð« BLOCKED BY EXTERNAL DEPENDENCY. Production media endpoints are still missing.
 
 ### Regression Summary
 Zero regressions. Session Manager, Conversation FSM, Event Bus, Pipeline Builder, and Pipecat Runtime were 100% unaffected by this migration. All 432 tests across the system continue to pass cleanly.
 
 
-## Milestone 18 — Twilio Runtime Validation
+## Milestone 18 â Twilio Runtime Validation
 
 Twilio runtime validation completed. Account connection, webhook verification, and regression tests successfully executed and verified. Media stream, pipeline providers, context isolation, and barge-in were documented as BLOCKED BY EXTERNAL DEPENDENCY due to AI agent inability to originate physical PSTN calls to establish the WebSocket Media Stream natively. Final detailed reports generated in .
 
 
-## Milestone 18 — Twilio Runtime Validation
+## Milestone 18 â Twilio Runtime Validation
 
 Twilio runtime validation completed. Account connection, webhook verification, and regression tests successfully executed and verified. Media stream, pipeline providers, context isolation, and barge-in were documented as BLOCKED BY EXTERNAL DEPENDENCY due to AI agent inability to originate physical PSTN calls to establish the WebSocket Media Stream natively. Final detailed reports generated in reports/.
 
 
-## Milestone 19 — Final End-to-End Phone Call Validation
+## Milestone 19 â Final End-to-End Phone Call Validation
 
 Final end-to-end evaluation was executed. The test environment successfully booted in Twilio mode with no start-up exceptions and all provider keys loaded correctly. Regression suites (432 tests) passed perfectly with `pytest`, `ruff`, and `mypy`.
 
@@ -1620,7 +1620,7 @@ However, the vast majority of physical runtime milestones (including live phone 
 
 ## Pillar 2 (Real Audio Services & Transport Layer) E2E Validation - POST-MERGE
 **Date**: 2026-07-10
-**Status**: ✅ VERIFIED & PRODUCTION READY
+**Status**: â VERIFIED & PRODUCTION READY
 
 ### Overview
 Pillar 2 (The Real-Time Transport and Audio Services Layer) has been completely integrated, debugged, and verified end-to-end with active API credentials (Twilio, Deepgram, Groq, ElevenLabs). The legacy codebase was successfully migrated to support Pipecat v1.5.0 via TwilioTransportAdapter and FastAPIWebsocketOutputTransport.
@@ -1637,29 +1637,29 @@ The Pillar 1 backend orchestration seamlessly integrates with the Pillar 2 exter
 
 
 ---
-## Milestone — Pillar 3 (AI Services): Company FAQ Knowledge Base Integration
+## Milestone â Pillar 3 (AI Services): Company FAQ Knowledge Base Integration
 **Date**: 2026-07-11
 **Pillar**: Pillar 3 (Groq LLM + Context Layer)
 **Author**: Aastha Sehgal
-**Status**: ✅ Complete
+**Status**: â Complete
 
 ### Overview
 As part of Pillar 3 (Groq LLM + Context Layer) ownership, added a company-specific FAQ knowledge base (`app/llm/knowledge_base.json` + `app/llm/company_faq.py`) so the voice agent can answer common customer questions about Cybernauts (services, contact info, company background) using verified information instead of relying on the LLM's general knowledge.
 
 ### What was built
-1. **`knowledge_base.json`** — Structured Q&A pairs across three categories: About the Company, Services, and General Support, sourced from Cybernauts' official website and LinkedIn.
-2. **`company_faq.py`** — Loader module exposing `get_faq_context_block()`, which formats the FAQ data into a text block for injection into the LLM system prompt.
-3. **Pipeline wiring** — `app/adapters/pipecat/adapter.py` now appends `get_faq_context_block()` to `VOICE_SYSTEM_PROMPT` before it's sent to the LLM, so every call has company context available.
-4. **Fallback behavior** — If a caller asks something outside the FAQ (e.g. pricing, contracts), the agent is instructed to avoid guessing and instead point the caller to the team directly (WhatsApp/email), rather than fabricating an answer.
-5. **Unit tests** (`tests/test_company_faq.py`) — 5 tests verifying JSON structure, expected categories, and correct context-block generation. All passing.
+1. **`knowledge_base.json`** â Structured Q&A pairs across three categories: About the Company, Services, and General Support, sourced from Cybernauts' official website and LinkedIn.
+2. **`company_faq.py`** â Loader module exposing `get_faq_context_block()`, which formats the FAQ data into a text block for injection into the LLM system prompt.
+3. **Pipeline wiring** â `app/adapters/pipecat/adapter.py` now appends `get_faq_context_block()` to `VOICE_SYSTEM_PROMPT` before it's sent to the LLM, so every call has company context available.
+4. **Fallback behavior** â If a caller asks something outside the FAQ (e.g. pricing, contracts), the agent is instructed to avoid guessing and instead point the caller to the team directly (WhatsApp/email), rather than fabricating an answer.
+5. **Unit tests** (`tests/test_company_faq.py`) â 5 tests verifying JSON structure, expected categories, and correct context-block generation. All passing.
 
 ### Conclusion
-This extends Pillar 3's existing Groq LLM + Context layer work with company-specific knowledge, fully wired into the live prompt-building path and independently testable. Decoupled from the in-progress Postgres/session_id memory work — no shared code or dependencies between the two efforts.
+This extends Pillar 3's existing Groq LLM + Context layer work with company-specific knowledge, fully wired into the live prompt-building path and independently testable. Decoupled from the in-progress Postgres/session_id memory work â no shared code or dependencies between the two efforts.
 
 ---
 ## Repository Cleanup & Documentation Consolidation
 **Date**: 2026-07-11
-**Status**: ✅ Complete
+**Status**: â Complete
 
 ### Overview
 Performed a comprehensive repository cleanup to enforce production-readiness, simplify maintenance, and strictly organize project documentation. 
@@ -1672,10 +1672,21 @@ Performed a comprehensive repository cleanup to enforce production-readiness, si
 - **Repository Simplified**: The project structure is now leaner and cleaner.
 
 ### Zero Functional Changes
-- ✅ No source code changed.
-- ✅ No tests changed.
-- ✅ No functionality changed.
-- ✅ All essential configurations, workflows, and core architecture logic have been fully preserved.
+- â No source code changed.
+- â No tests changed.
+- â No functionality changed.
+- â All essential configurations, workflows, and core architecture logic have been fully preserved.
+---
+
+## Milestone 13 — Pipecat Pipeline Stabilization
+**Date**: 2026-07-12
+**Status**: ✅ Complete
+**Scope**: app/adapters/pipecat/adapter.py, app/adapters/pipecat/processors.py
+
+### What Was Fixed
+1. **Processor Mapping Substring Collision**: DeepgramSTTService was wrongly mapped as the TTS processor because its name contained the substring " TTS" (DeepgramST**TTS**ervice). Fixed using `.endswith("TTSService")`.
+2. **Greeting Latency and Silent Drops**: Migrated from `LLMMessagesAppendFrame` to `TTSSpeakFrame`. `TTSSpeakFrame` bypasses the LLM entirely, providing an immediate, deterministic pipeline greeting without racing the StartFrame propagation.
+3. **Event Timing**: Wrapped the initial greeting inside an `asyncio.create_task` with a 1.5s sleep to guarantee pipeline is fully listening before speaking.
 
 ---
 

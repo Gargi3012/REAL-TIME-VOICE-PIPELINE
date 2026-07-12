@@ -36,6 +36,7 @@ GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama3-8b-8192")
 # ── ElevenLabs (Text-to-Speech) ───────────────────────────────────────
 ELEVEN_LABS_API_KEY: str = os.getenv("ELEVEN_LABS_API_KEY", "")
 ELEVEN_LABS_VOICE_ID: str = os.getenv("ELEVEN_LABS_VOICE_ID", "21m00TlvDq8ikWAM")
+ELEVENLABS_MODEL: str = os.getenv("ELEVENLABS_MODEL", "eleven_flash_v2_5")
 
 # ── Bot identity ───────────────────────────────────────────────────────
 BOT_NAME: str = os.getenv("BOT_NAME", "Cybernauts Agent")
