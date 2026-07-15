@@ -55,6 +55,9 @@ class LiveKitTransportAdapter(PipecatTransportAdapter):
     """Implementation for LiveKit WebRTC."""
 
     def __init__(self, room_url: str, bot_name: str):
+        if not room_url:
+            raise ValueError("LIVEKIT_URL is not set")
+            
         from livekit import api
         from app.config import LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_ROOM
         

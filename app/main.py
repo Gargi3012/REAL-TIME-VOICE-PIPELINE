@@ -210,6 +210,7 @@ async def run_voice_session(
 
     await event_bus.subscribe("SessionClosed", on_session_closed)
                 
+    await event_bus.subscribe(SessionClosed.__name__, on_session_closed)
     await event_bus.start()
     event_bus.publish_sync(SessionCreated(session_id=session_id))
     logger.info("EventBus started")
