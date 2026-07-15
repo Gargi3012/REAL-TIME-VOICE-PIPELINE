@@ -111,10 +111,19 @@ def _build_real_pipeline_task(
         if prev_summary:
             system_content += "\n\nPrevious Conversation Summary for this caller:\n" + prev_summary
 
+        async def end_call(params):
+            """End the conversation when the user naturally says goodbye or indicates they are done. ALWAYS say a natural farewell to the user FIRST before calling this function."""
+            logger.info("LLM triggered end_call function! Queueing EndFrame to terminate call.")
+            if params.result_callback:
+                await params.result_callback({"status": "ending_call"})
+            from pipecat.frames.frames import EndFrame
+            await task.queue_frames([EndFrame()])
+
         context = LLMContext(
               messages=[
                  {"role": "system", "content": system_content}
-               ]
+               ],
+              tools=[end_call]
             )
         
         # Optimize Turn Stop Strategy for extreme low latency (bypasses LLM completeness checks)
@@ -197,6 +206,13 @@ def _build_real_pipeline_task(
                 bridge.on_audio_finished()
 
     task = PipelineTask(real_pipeline, observers=[EventBridgeObserver()])
+
+    # Attach the LLMContext to the task so the adapter can access it later for greetings
+    task._llm_context = context
+    
+    if llm and hasattr(llm, "register_function"):
+        llm.register_function("end_call", end_call)
+
     return task
 
 
