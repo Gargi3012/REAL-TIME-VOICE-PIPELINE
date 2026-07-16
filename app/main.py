@@ -200,10 +200,49 @@ async def run_voice_session(
                 c_id = uuid.UUID(c_id_str)
                 
                 # Mock LLM Summary Generation (in real prod, call an LLM API here with transcript)
-                history_texts = [msg.content for msg in sess_data.history if msg.role != "system"]
-                transcript = " | ".join(history_texts)
-                generated_summary = f"Summary of call ({len(history_texts)} turns): {transcript[:500]}..."
-                
+                # Real LLM Summary Generation — combines previous summary + this call's
+                # transcript into one updated, concise summary (overwrites the old one).
+                from app.llm.client import GroqLLMClient
+                from app.session.message import Message
+
+                history_texts = [
+                    f"{msg.role}: {msg.content}"
+                    for msg in sess_data.history
+                    if msg.role != "system"
+                ]
+                transcript = "\n".join(history_texts)
+
+                prev_summary_text = sess_data.metadata.get("previous_summary", "")
+
+                summary_prompt = (
+                    "You are maintaining a running memory of a caller for a voice assistant. "
+                    "Combine the previous summary with the new call transcript below into ONE "
+                    "updated summary. Keep it concise (3-5 sentences), factual, and focused on "
+                    "details useful for future calls (who they are, what they asked about, any "
+                    "preferences or unresolved issues). Do not include greetings or small talk.\n\n"
+                    f"Previous summary:\n{prev_summary_text if prev_summary_text else '(none, first call)'}\n\n"
+                    f"New call transcript:\n{transcript if transcript else '(no conversation recorded)'}"
+                )
+
+                try:
+                    summary_client = GroqLLMClient()
+                    summary_messages = [
+                        Message(role="system", content="You write concise caller memory summaries."),
+                        Message(role="user", content=summary_prompt),
+                    ]
+                    generated_summary = ""
+                    async for chunk in summary_client.stream_response(summary_messages):
+                        generated_summary += chunk
+                    generated_summary = generated_summary.strip()
+                    if not generated_summary:
+                        generated_summary = prev_summary_text  # fallback: keep old summary
+                except Exception as summary_err:
+                    logger.error(
+                        "Summary generation failed for session {sid}: {err}",
+                        sid=event.session_id, err=summary_err,
+                    )
+                    generated_summary = prev_summary_text  # fallback: don't lose old summary on failure
+
                 await SessionRepository.save_summary(db_session, c_id, generated_summary)
                 await SessionRepository.close_session(db_session, event.session_id, int(sess_data.duration_seconds))
                 logger.info("Persisted call summary and closed DB session for {sid}", sid=event.session_id)
@@ -284,6 +323,8 @@ async def run_voice_session(
 
         await session_manager.set_state(session_id, SessionState.CLOSED)
         event_bus.publish_sync(SessionClosed(session_id=session_id))
+        await event_bus._queue.join()  # Wait for SessionClosed to be processed (persists summary) before stopping
+
 
         await event_bus.stop()
         logger.info("Session closed | session_id={sid}", sid=session_id)
