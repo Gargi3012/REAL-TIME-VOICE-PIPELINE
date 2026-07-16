@@ -53,7 +53,7 @@ async def handle_inbound_call(request: Request):
     
     # Extract phone number
     form_data = await request.form()
-    phone_number = form_data.get("From", "unknown_client")
+    phone_number = form_data.get("To", "unknown_client")
     import urllib.parse
     phone_encoded = urllib.parse.quote(phone_number)
     
