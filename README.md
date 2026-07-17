@@ -64,6 +64,7 @@ It provides an orchestration framework capable of handling streaming audio and b
 - **Streaming STT**: Word-level continuous transcription.
 - **Modular TTS**: Byte-streaming synthesized audio playback.
 - **Conversation context**: Long-running conversation awareness.
+- **Lead Capture & Tool Execution**: AI dynamically collects user details and triggers backend actions (`save_lead`).
 - **Clean Architecture**: Strong boundary layers and dependency inversion.
 - **Strong test coverage**: 430+ passing unit and integration tests.
 
@@ -121,6 +122,7 @@ It provides an orchestration framework capable of handling streaming audio and b
 | LiveKit Migration | ✅ |
 | Twilio Transport | ✅ |
 | TTS Integration | ✅ |
+| Lead Capture & Tools | ✅ |
 | Runtime Validation | ✅ |
 
 ## 8. Benchmark Summary
