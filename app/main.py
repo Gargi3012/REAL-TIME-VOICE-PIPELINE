@@ -42,8 +42,21 @@ from app.adapters.pipecat.transport import TwilioTransportAdapter
 import time
 global_timers = {}
 
-# ── FastAPI App for Twilio ──────────────────────────────────────────────
+# ── FastAPI App for Twilio & LiveKit ────────────────────────────────────
+from fastapi.middleware.cors import CORSMiddleware
+from app.routers import livekit_router
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(livekit_router.router)
 
 @app.post("/inbound-call")
 async def handle_inbound_call(request: Request):
@@ -273,6 +286,64 @@ async def run_voice_session(
     await event_bus.start()
     event_bus.publish_sync(SessionCreated(session_id=session_id))
     logger.info("EventBus started")
+    
+    # ── 2b. UI WebSocket Bridges ────────────────────────────────────────
+    from app.routers.livekit_router import broadcast_frontend_event
+    from app.events.event_types import (
+        AssistantGreetingStarted, AssistantGreetingCompleted,
+        TranscriptReady, ThinkingStarted, ResponseGenerated,
+        SpeakingStarted, SpeakingFinished, ErrorOccurred
+    )
+
+    async def on_greeting_started(e: AssistantGreetingStarted):
+        await broadcast_frontend_event("greeting_started")
+
+    async def on_greeting_completed(e: AssistantGreetingCompleted):
+        await broadcast_frontend_event("greeting_complete")
+
+    async def on_transcript_ready(e: TranscriptReady):
+        await broadcast_frontend_event("transcription_received", {
+            "text": e.payload.get("transcript", ""),
+            "language": e.payload.get("language", "unknown"),
+            "latency_ms": e.payload.get("latency_ms", 0)
+        })
+        
+    async def on_thinking_started(e: ThinkingStarted):
+        await broadcast_frontend_event("llm_response_generating", {
+            "latency_so_far_ms": e.payload.get("latency_so_far_ms", 0)
+        })
+
+    async def on_response_generated(e: ResponseGenerated):
+        await broadcast_frontend_event("llm_response_complete", {
+            "response_text": e.payload.get("response", ""),
+            "latency_ms": e.payload.get("latency_ms", 0)
+        })
+
+    async def on_speaking_started(e: SpeakingStarted):
+        await broadcast_frontend_event("tts_playing", {
+            "duration_ms": e.payload.get("duration_ms", 0),
+            "latency_ms": e.payload.get("latency_ms", 0)
+        })
+        
+    async def on_speaking_finished(e: SpeakingFinished):
+        await broadcast_frontend_event("tts_complete", {
+            "latency_ms": e.payload.get("latency_ms", 0)
+        })
+
+    async def on_error(e: ErrorOccurred):
+        await broadcast_frontend_event("error", {
+            "error_message": str(e.payload.get("error", "Unknown pipeline error")),
+            "component": e.payload.get("component", "unknown")
+        })
+
+    await event_bus.subscribe("AssistantGreetingStarted", on_greeting_started)
+    await event_bus.subscribe("AssistantGreetingCompleted", on_greeting_completed)
+    await event_bus.subscribe("TranscriptReady", on_transcript_ready)
+    await event_bus.subscribe("ThinkingStarted", on_thinking_started)
+    await event_bus.subscribe("ResponseGenerated", on_response_generated)
+    await event_bus.subscribe("SpeakingStarted", on_speaking_started)
+    await event_bus.subscribe("SpeakingFinished", on_speaking_finished)
+    await event_bus.subscribe("ErrorOccurred", on_error)
 
     # ── 3. Conversation FSM ─────────────────────────────────────────────
     fsm = ConversationStateMachine(session_id=session_id)
@@ -359,14 +430,10 @@ async def run_voice_session(
 
 def main() -> None:
     """Synchronous entry point."""
-    if TRANSPORT_MODE.lower() == "twilio":
-        logger.info("TRANSPORT_MODE is set to 'twilio'. Starting FastAPI server...")
-        import uvicorn
-        # Run uvicorn server programmatically
-        uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
-    else:
-        logger.info("TRANSPORT_MODE is set to '{mode}'. Running standalone script...", mode=TRANSPORT_MODE)
-        asyncio.run(run_voice_session())
+    import uvicorn
+    logger.info(f"TRANSPORT_MODE is set to '{TRANSPORT_MODE}'. Starting FastAPI server on port 5000...")
+    # Always run the FastAPI server so the frontend can hit /api/livekit/join and /ws/frontend
+    uvicorn.run("app.main:app", host="0.0.0.0", port=5000, reload=True)
 
 
 if __name__ == "__main__":

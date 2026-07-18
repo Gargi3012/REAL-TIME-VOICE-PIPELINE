@@ -120,7 +120,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
         model_name = metadata.get("model", ELEVENLABS_MODEL)
         tts = ElevenLabsTTSService(
             api_key=ELEVEN_LABS_API_KEY,
-            sample_rate=8000,
+            sample_rate=16000,
             settings=ElevenLabsTTSService.Settings(
                 voice=voice_id,
                 model=model_name,
