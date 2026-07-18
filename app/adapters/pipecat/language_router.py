@@ -44,9 +44,12 @@ class LanguageRoutingProcessor(FrameProcessor):
             hindi_word_count = len(words.intersection(self.HINDI_INDICATORS))
             
             # Force language based on indicators
-            if has_devanagari or hindi_word_count >= 1:
-                logger.info(f"Language Detection: Hindi/Hinglish detected in '{frame.text}' (Devanagari: {devanagari_count}, Hinglish indicators: {hindi_word_count})")
-                frame.text = f"{frame.text}\n[You MUST reply completely in natural Hindi]"
+            if has_devanagari:
+                logger.info(f"Language Detection: Pure Hindi detected in '{frame.text}'")
+                frame.text = f"{frame.text}\n[You MUST reply completely in natural Hindi (Devanagari script)]"
+            elif hindi_word_count >= 1:
+                logger.info(f"Language Detection: Hinglish detected in '{frame.text}'")
+                frame.text = f"{frame.text}\n[You MUST reply in conversational Hinglish (Roman script)]"
             else:
                 logger.info(f"Language Detection: English detected in '{frame.text}'")
                 frame.text = f"{frame.text}\n[You MUST reply completely in English]"

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Pipeline Testing Frontend</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <img src="logo.jpg" alt="Cybernauts Logo" class="logo-icon" />
+                <h1>Cybernauts</h1>
+            </div>
+            <div id="transport-mode-indicator" class="transport-indicator">
+                Checking mode...
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main id="livekit-main" class="main-content">
+            <!-- Connection Panel -->
+            <section class="panel connection-panel">
+                <div class="connection-status">
+                    <span id="connection-dot" class="dot"></span>
+                    <span id="connection-text">Disconnected</span>
+                </div>
+                <div class="connection-actions">
+                    <button id="btn-join" class="btn btn-primary">Join Call</button>
+                    <button id="btn-leave" class="btn btn-secondary" disabled>Leave Call</button>
+                </div>
+            </section>
+
+            <!-- Metrics Strip -->
+            <section class="metrics-strip">
+                <div class="metric-item">
+                    <span class="metric-label">End-to-End Latency:</span>
+                    <span id="metric-latency" class="metric-value">0ms</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label">Language:</span>
+                    <span id="metric-language" class="metric-value">-</span>
+                </div>
+            </section>
+
+            <!-- Chat History -->
+            <section id="chat-history" class="chat-history">
+                <div class="chat-placeholder">Your conversation will appear here...</div>
+                <!-- Chat bubbles will be injected here -->
+            </section>
+
+            <!-- Active Status Panel -->
+            <section class="active-panel">
+                <div class="active-status">
+                    <div id="status-spinner" class="spinner hidden"></div>
+                    <div id="status-text" class="status-text">Ready for input</div>
+                </div>
+                <div id="audio-visualizer" class="visualizer hidden">
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                </div>
+            </section>
+        </main>
+        
+        <div id="twilio-overlay" class="twilio-overlay hidden">
+            <div class="overlay-content">
+                <h2>Twilio Mode Active</h2>
+                <p>System is in Twilio mode. Browser testing is not available.</p>
+                <p>Please switch TRANSPORT_MODE to "livekit" in your backend to use this frontend.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- LiveKit JS Client SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+
+
+

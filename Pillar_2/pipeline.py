@@ -6,7 +6,7 @@ def create_deepgram_stt(api_key: str, model: str = "nova-2-phonecall", language:
     """Exposed factory for the main app to build the Deepgram service via Pillar 2."""
     return DeepgramSTTService(
         api_key=api_key,
-        sample_rate=8000,
+        sample_rate=16000,
         settings=DeepgramSTTService.Settings(
             model=model,
             language=language,

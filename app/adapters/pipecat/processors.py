@@ -124,7 +124,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
             model_name = metadata.get("model", ELEVENLABS_MODEL)
             tts = ElevenLabsTTSService(
                 api_key=ELEVEN_LABS_API_KEY,
-                sample_rate=8000,
+                sample_rate=16000,
                 settings=ElevenLabsTTSService.Settings(
                     voice=voice_id,
                     model=model_name,
@@ -145,7 +145,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
             voice = metadata.get("voice", DEEPGRAM_TTS_VOICE)
             tts = DeepgramTTSService(
                 api_key=DEEPGRAM_API_KEY,
-                sample_rate=8000,
+                sample_rate=16000,
                 settings=DeepgramTTSService.Settings(voice=voice),
             )
             logger.info("DeepgramTTSService created | voice={v}", v=voice)
@@ -154,7 +154,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
         elif provider == "chatterbox":
             from app.adapters.pipecat.chatterbox_tts_service import ChatterboxTTSService
 
-            tts = ChatterboxTTSService(sample_rate=8000)
+            tts = ChatterboxTTSService(sample_rate=16000)
             logger.info("ChatterboxTTSService created (local CPU)")
             return tts
 
@@ -169,7 +169,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
             tts = CartesiaTTSService(
                 api_key=CARTESIA_API_KEY,
                 voice_id=voice_id,
-                sample_rate=8000,
+                sample_rate=16000,
             )
             logger.info("CartesiaTTSService created | voice_id={v}", v=voice_id)
             return tts
