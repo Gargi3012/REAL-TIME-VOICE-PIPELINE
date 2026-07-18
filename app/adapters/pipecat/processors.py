@@ -1,11 +1,3 @@
-"""
-Processor mapping for Pipecat.
-
-create_pipecat_processor() is a factory that returns the real Pipecat
-service instance for each ProcessorRole when the full pipecat-ai package
-is installed, or a MockPipecatProcessor when it is not (test environments).
-"""
-
 from typing import Any
 
 import os
@@ -84,12 +76,16 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
         if not DEEPGRAM_API_KEY:
             raise ValueError("DEEPGRAM_API_KEY is not set in your .env file.")
 
+        from app.config import TRANSPORT_MODE
+        sample_rate = 16000 if TRANSPORT_MODE.lower() == "livekit" else 8000
+
         # Call Pillar_2 STT factory
         pillar2_pipeline = _import_pillar2_module("pillar2_pipeline", "pipeline.py")
         stt = pillar2_pipeline.create_deepgram_stt(
             api_key=DEEPGRAM_API_KEY,
             model=metadata.get("model", "nova-2"),
-            language=metadata.get("language", "hi")
+            language=metadata.get("language", "hi"),
+            sample_rate=sample_rate
         )
         logger.info("DeepgramSTTService created (via Pillar 2) | model={m}", m=metadata.get("model", "nova-2"))
         return stt
@@ -109,9 +105,10 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
         return llm
 
     elif role == ProcessorRole.TTS:
-        from app.config import TTS_PROVIDER
-
+        from app.config import TTS_PROVIDER, TRANSPORT_MODE
+        
         provider = metadata.get("provider", TTS_PROVIDER)
+        sample_rate = 16000 if TRANSPORT_MODE.lower() == "livekit" else 8000
         
         if provider == "elevenlabs":
             from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
@@ -124,7 +121,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
             model_name = metadata.get("model", ELEVENLABS_MODEL)
             tts = ElevenLabsTTSService(
                 api_key=ELEVEN_LABS_API_KEY,
-                sample_rate=16000,
+                sample_rate=sample_rate,
                 settings=ElevenLabsTTSService.Settings(
                     voice=voice_id,
                     model=model_name,
@@ -145,7 +142,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
             voice = metadata.get("voice", DEEPGRAM_TTS_VOICE)
             tts = DeepgramTTSService(
                 api_key=DEEPGRAM_API_KEY,
-                sample_rate=16000,
+                sample_rate=sample_rate,
                 settings=DeepgramTTSService.Settings(voice=voice),
             )
             logger.info("DeepgramTTSService created | voice={v}", v=voice)
@@ -154,7 +151,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
         elif provider == "chatterbox":
             from app.adapters.pipecat.chatterbox_tts_service import ChatterboxTTSService
 
-            tts = ChatterboxTTSService(sample_rate=16000)
+            tts = ChatterboxTTSService(sample_rate=sample_rate)
             logger.info("ChatterboxTTSService created (local CPU)")
             return tts
 
@@ -169,7 +166,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
             tts = CartesiaTTSService(
                 api_key=CARTESIA_API_KEY,
                 voice_id=voice_id,
-                sample_rate=16000,
+                sample_rate=sample_rate,
             )
             logger.info("CartesiaTTSService created | voice_id={v}", v=voice_id)
             return tts
