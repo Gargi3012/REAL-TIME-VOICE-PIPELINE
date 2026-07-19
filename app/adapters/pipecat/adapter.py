@@ -83,8 +83,9 @@ def _build_real_pipeline_task(
         
         # In Pipecat 1.5.0, VAD is a separate processor that must be injected manually
         from pipecat.processors.audio.vad_processor import VADProcessor
+        from pipecat.audio.vad.vad_analyzer import VADParams
         from pipecat.audio.vad.silero import SileroVADAnalyzer
-        processors.append(VADProcessor(vad_analyzer=SileroVADAnalyzer()))
+        processors.append(VADProcessor(vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2))))
 
     # 2. Core processors (STT → LLM → TTS) from the mapper
     # We must wire up the OpenAILLMContext and aggregator for the LLM
@@ -138,7 +139,7 @@ def _build_real_pipeline_task(
             
         agg_params = LLMUserAggregatorParams(
             user_turn_strategies=UserTurnStrategies(
-                stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.6)]
+                stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.35)]
             ),
             user_mute_strategies=mute_strategies
         )
