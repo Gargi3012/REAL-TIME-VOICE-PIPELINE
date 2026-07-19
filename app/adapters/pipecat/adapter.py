@@ -287,7 +287,7 @@ class PipecatAdapter:
                 if any("Mock" in type(p).__name__ for p in self.pipecat_processors):
                     raise ImportError("Force mock fallback for tests because mock processors exist")
                 self.task = _build_real_pipeline_task(
-                    pipecat_processors, self.transport, self.bridge, self.latency_tracker
+                    self.pipecat_processors, self.transport, self.bridge, self.latency_tracker
                 )
                 logger.bind(session_id=self.session_id).info(
                     "Real pipecat PipelineTask created"
