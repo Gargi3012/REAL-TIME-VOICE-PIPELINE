@@ -26,16 +26,16 @@ class DatabaseConnectionManager:
     def init_db(self) -> None:
         """Initialize the async engine and session factory."""
         if self._engine is None:
-            self._engine = create_async_engine(
-                DATABASE_URL,
-                pool_size=DATABASE_POOL_SIZE,
-                max_overflow=DATABASE_MAX_OVERFLOW,
-                pool_timeout=DATABASE_POOL_TIMEOUT,
-                pool_pre_ping=True,
-                pool_recycle=300,
-                echo=False,
+           self._engine = create_async_engine(
+             DATABASE_URL,
+             pool_size=DATABASE_POOL_SIZE,
+             max_overflow=DATABASE_MAX_OVERFLOW,
+             pool_timeout=DATABASE_POOL_TIMEOUT,
+             pool_pre_ping=True,
+             pool_recycle=300,
+             echo=False,
             )
-            self._sessionmaker = async_sessionmaker(
+        self._sessionmaker = async_sessionmaker(
                 bind=self._engine,
                 class_=AsyncSession,
                 expire_on_commit=False,
