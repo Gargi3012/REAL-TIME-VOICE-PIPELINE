@@ -22,6 +22,7 @@ class PipecatFactory:
         transport: Optional[PipecatTransportAdapter] = None,
         fsm: Optional[Any] = None,
         latency_tracker: Optional[Any] = None,
+        previous_summary: str = "",
     ) -> PipecatAdapter:
         """Create and return a configured PipecatAdapter.
 
@@ -35,6 +36,7 @@ class PipecatFactory:
             fsm:          Optional ConversationStateMachine.  When provided,
                           the adapter drives FSM state on each pipeline stage.
             latency_tracker: Optional tracker for latency metrics.
+            previous_summary: Optional previous conversation summary.
         """
         return PipecatAdapter(
             pipeline=pipeline,
@@ -44,4 +46,5 @@ class PipecatFactory:
             transport=transport,
             fsm=fsm,
             latency_tracker=latency_tracker,
+            previous_summary=previous_summary,
         )

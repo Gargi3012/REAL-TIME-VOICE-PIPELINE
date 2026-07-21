@@ -24,25 +24,30 @@ class LatencyFillerProcessor(FrameProcessor):
         
         # Preload all audio files
         import random
+        import soundfile as sf
         self.random = random
         
         for path in filler_wav_paths:
             try:
                 if os.path.exists(path):
                     frames = []
-                    with wave.open(path, "rb") as wf:
-                        sample_rate = wf.getframerate()
-                        num_channels = wf.getnchannels()
-                        chunk_frames = int(sample_rate * 0.05) # 50ms chunks
-                        while True:
-                            data = wf.readframes(chunk_frames)
-                            if not data:
-                                break
-                            frames.append(OutputAudioRawFrame(
-                                audio=data,
-                                sample_rate=sample_rate,
-                                num_channels=num_channels
-                            ))
+                    data, sample_rate = sf.read(path, dtype="int16")
+                    num_channels = 1 if data.ndim == 1 else data.shape[1]
+                    
+                    # Convert to bytes
+                    bytes_data = data.tobytes()
+                    
+                    # Chunk it into 50ms chunks (sample_rate * 0.05 * 2 bytes per sample * num_channels)
+                    bytes_per_sample = 2
+                    chunk_bytes = int(sample_rate * 0.05) * bytes_per_sample * num_channels
+                    
+                    for i in range(0, len(bytes_data), chunk_bytes):
+                        chunk = bytes_data[i:i+chunk_bytes]
+                        frames.append(OutputAudioRawFrame(
+                            audio=chunk,
+                            sample_rate=sample_rate,
+                            num_channels=num_channels
+                        ))
                     self._audio_frames_list.append(frames)
                     logger.info(f"Loaded {len(frames)} chunks from {path} for filler processor.")
                 else:

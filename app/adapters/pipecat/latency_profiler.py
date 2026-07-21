@@ -11,7 +11,7 @@ from pipecat.frames.frames import (
     TTSStoppedFrame,
     LLMFullResponseEndFrame,
 )
-from app.main import global_timers
+
 
 class LatencyProfiler(FrameProcessor):
     def __init__(self, **kwargs):
@@ -24,32 +24,22 @@ class LatencyProfiler(FrameProcessor):
         await super().process_frame(frame, direction)
         now = time.perf_counter()
         
-        if isinstance(frame, TranscriptionFrame):
-            if "first_partial_transcript" not in global_timers:
-                global_timers["first_partial_transcript"] = now
+            if isinstance(frame, TranscriptionFrame):
                 logger.info(f"[PROFILER] First Partial Transcript: {now}")
-            # If we want final transcript, we need to wait until VADUserStoppedSpeakingFrame or we can track it by looking at frame.text?
-            
-        elif isinstance(frame, LLMFullResponseStartFrame):
-            if "llm_first_token" not in global_timers:
-                global_timers["llm_first_token"] = now
+                
+            elif isinstance(frame, LLMFullResponseStartFrame):
                 logger.info(f"[PROFILER] LLM First Token: {now}")
+                    
+            elif isinstance(frame, LLMFullResponseEndFrame):
+                logger.info(f"[PROFILER] LLM Complete: {now}")
+                    
+            elif isinstance(frame, TTSStartedFrame):
+                logger.info(f"[PROFILER] TTS First Byte: {now}")
                 
-        elif isinstance(frame, LLMFullResponseEndFrame):
-            global_timers["llm_complete"] = now
-            logger.info(f"[PROFILER] LLM Complete: {now}")
+            elif isinstance(frame, TTSStoppedFrame):
+                logger.info(f"[PROFILER] TTS Complete: {now}")
                 
-        elif isinstance(frame, TTSStartedFrame):
-            global_timers["tts_first_byte"] = now
-            logger.info(f"[PROFILER] TTS First Byte: {now}")
-            
-        elif isinstance(frame, TTSStoppedFrame):
-            global_timers["tts_complete"] = now
-            logger.info(f"[PROFILER] TTS Complete: {now}")
-            
-        elif isinstance(frame, AudioRawFrame):
-            if "first_audio_playback" not in global_timers:
-                global_timers["first_audio_playback"] = now
+            elif isinstance(frame, AudioRawFrame):
                 logger.info(f"[PROFILER] First Audio Playback: {now}")
 
         await self.push_frame(frame, direction)

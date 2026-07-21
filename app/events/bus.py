@@ -70,12 +70,16 @@ class EventBus(Publisher):
         while True:
             try:
                 event = await self._queue.get()
-                await self.publish(event)
-                self._queue.task_done()
+                try:
+                    await self.publish(event)
+                except Exception as e:
+                    logger.exception("EventBus worker error: {err}", err=str(e))
+                finally:
+                    self._queue.task_done()
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error("EventBus worker error: {err}", err=str(e))
+                logger.error("EventBus worker unexpected error: {err}", err=str(e))
 
     # ==================================================================
     #  Middleware

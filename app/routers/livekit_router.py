@@ -1,15 +1,57 @@
 import os
 import asyncio
+import time
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from collections import defaultdict
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
 from livekit import api
+from loguru import logger
 
 router = APIRouter()
 
 # Global manager to keep track of frontend connections
 frontend_websockets = []
 
-@router.post("/api/livekit/join")
+# --- Security Dependencies ---
+security = HTTPBearer()
+JWT_SECRET = os.getenv("JWT_SECRET", "super-secret-key")
+
+rate_limit_records = defaultdict(list)
+RATE_LIMIT_REQUESTS = 5
+RATE_LIMIT_WINDOW = 60
+
+async def rate_limit(request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    current_time = time.time()
+    
+    # Cleanup old records
+    rate_limit_records[client_ip] = [
+        t for t in rate_limit_records[client_ip] 
+        if current_time - t < RATE_LIMIT_WINDOW
+    ]
+    
+    if len(rate_limit_records[client_ip]) >= RATE_LIMIT_REQUESTS:
+        logger.warning(f"SECURITY: Rate limit exceeded for IP {client_ip} on /api/livekit/join")
+        raise HTTPException(status_code=429, detail="Too many requests")
+        
+    rate_limit_records[client_ip].append(current_time)
+
+async def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        logger.info(f"SECURITY: Successful authentication for user {payload.get('sub', 'unknown')} on /api/livekit/join")
+        return payload
+    except jwt.ExpiredSignatureError:
+        logger.warning("SECURITY: Expired JWT token attempt")
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        logger.warning("SECURITY: Invalid JWT token attempt")
+        raise HTTPException(status_code=403, detail="Invalid authentication token")
+
+@router.post("/api/livekit/join", dependencies=[Depends(rate_limit), Depends(verify_jwt)])
 async def join_livekit_room(request: dict = None):
     if os.getenv("TRANSPORT_MODE") != "livekit":
         raise HTTPException(status_code=400, detail="Not in LiveKit mode")
@@ -35,7 +77,7 @@ async def join_livekit_room(request: dict = None):
             from app.main import run_voice_session
             asyncio.create_task(run_voice_session())
         except Exception as e:
-            pass
+            logger.exception(f"Failed to start voice session background task: {e}")
         
         return {
             "token": token.to_jwt(),

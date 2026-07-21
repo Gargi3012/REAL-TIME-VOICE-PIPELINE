@@ -22,7 +22,7 @@ os.environ["SSL_CERT_FILE"] = certifi.where()
 ssl._create_default_https_context = ssl._create_unverified_context
 
 from loguru import logger
-from fastapi import FastAPI, WebSocket, Request
+from fastapi import FastAPI, WebSocket, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.websockets import WebSocketDisconnect
 
@@ -40,7 +40,6 @@ from app.adapters.pipecat.transport import TwilioTransportAdapter
 
 
 import time
-global_timers = {}
 
 # ── FastAPI App for Twilio & LiveKit ────────────────────────────────────
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,9 +47,24 @@ from app.routers import livekit_router
 
 app = FastAPI()
 
+env_origins = os.getenv("ALLOWED_ORIGINS", "")
+allowed_origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+
+if os.getenv("ENVIRONMENT", "development").lower() == "development":
+    allowed_origins.extend([
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8000",
+    ])
+
+if not allowed_origins:
+    logger.warning("No ALLOWED_ORIGINS set in environment. Restricting to strict localhost.")
+    allowed_origins = ["http://localhost:8000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -61,11 +75,35 @@ app.include_router(livekit_router.router)
 @app.post("/inbound-call")
 async def handle_inbound_call(request: Request):
     """Twilio webhook endpoint. Returns TwiML to connect to our WebSocket."""
-    global_timers["webhook_processing_start"] = time.perf_counter()
+    webhook_processing_start = time.perf_counter()
     logger.info("Incoming Twilio call received")
     
-    # Extract phone number
     form_data = await request.form()
+    
+    # ── Security: Twilio Signature Validation ───────────────────────────
+    from twilio.request_validator import RequestValidator
+    from app.config import TWILIO_AUTH_TOKEN
+    import os
+    
+    # Twilio signs the exact URL they requested.
+    # Ngrok forwards the original Host, but drops HTTPS to HTTP.
+    original_url = str(request.url)
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    if forwarded_proto == "https" and original_url.startswith("http://"):
+        validator_url = original_url.replace("http://", "https://", 1)
+    else:
+        validator_url = original_url
+        
+    signature = request.headers.get("X-Twilio-Signature", "")
+    form_dict = {k: v for k, v in form_data.items()}
+    
+    validator = RequestValidator(TWILIO_AUTH_TOKEN)
+    if not validator.validate(validator_url, form_dict, signature):
+        client_ip = request.client.host if request.client else "unknown"
+        logger.warning(f"SECURITY: Invalid Twilio signature from {client_ip}. Rejecting request.")
+        raise HTTPException(status_code=403, detail="Forbidden")
+        
+    # Extract phone number
     phone_number = form_data.get("To", "unknown_client")
     import urllib.parse
     phone_encoded = urllib.parse.quote(phone_number)
@@ -97,19 +135,17 @@ async def handle_inbound_call(request: Request):
     else:
         host = request.headers.get("host", "localhost:8000")
         scheme = "wss" if "ngrok" in host or request.headers.get("x-forwarded-proto") == "https" else "ws"
-        stream_url = f"{scheme}://{host}/ws?phone={phone_encoded}&client_id={client_id_str}"
-    
-    # Note: We NO LONGER append company_context or previous_summary to the stream_url 
-    # to avoid exceeding Twilio's 255-character limit for the <Stream url> attribute.
-    # They are fetched natively inside the websocket handler.
-    
-    # Escape ampersands for valid XML
-    stream_url_xml = stream_url.replace("&", "&amp;")
+    # Use custom parameters instead of query string to avoid Twilio stripping them
+    stream_url = public_url.replace("http://", "ws://").replace("https://", "wss://") + "/ws"
     
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
-        <Stream url="{stream_url_xml}" />
+        <Stream url="{stream_url}">
+            <Parameter name="phone" value="{phone_number}" />
+            <Parameter name="client_id" value="{client_id_str}" />
+            <Parameter name="webhook_processing_start" value="{webhook_processing_start}" />
+        </Stream>
     </Connect>
 </Response>
 """
@@ -119,7 +155,7 @@ async def handle_inbound_call(request: Request):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Twilio WebSocket endpoint for Pipecat audio stream."""
-    global_timers["media_stream_connection"] = time.perf_counter()
+    media_stream_connection = time.perf_counter()
     await websocket.accept()
     logger.info("WebSocket connection accepted from Twilio")
     
@@ -133,8 +169,22 @@ async def websocket_endpoint(websocket: WebSocket):
         msg = json.loads(data)
         if msg.get("event") == "start":
             stream_sid = msg["start"]["streamSid"]
-            global_timers["first_audio_packet"] = time.perf_counter()
-            logger.info(f"Twilio stream started: {stream_sid}")
+            
+            # Extract custom parameters from the start event
+            custom_params = msg["start"].get("customParameters", {})
+            phone_number = custom_params.get("phone", "unknown_client")
+            client_id_str = custom_params.get("client_id", "")
+            company_context = custom_params.get("company_context", "")
+            webhook_processing_start = float(custom_params.get("webhook_processing_start", 0.0))
+            
+            first_audio_packet = time.perf_counter()
+            connection_metrics = {
+                "webhook_processing_start": webhook_processing_start,
+                "media_stream_connection": media_stream_connection,
+                "first_audio_packet": first_audio_packet,
+            }
+            masked_phone = f"{phone_number[:3]}******{phone_number[-4:]}" if len(phone_number) > 7 and phone_number != "unknown_client" else phone_number
+            logger.info(f"Twilio stream started: {stream_sid} | phone: {masked_phone} | client_id: {client_id_str}")
             break
         elif msg.get("event") == "connected":
             logger.info("Twilio connected event received")
@@ -147,20 +197,18 @@ async def websocket_endpoint(websocket: WebSocket):
     
     transport = TwilioTransportAdapter(websocket=websocket, stream_sid=stream_sid)
     
-    # Extract params from URL query (P1 Fix)
-    phone_number = websocket.query_params.get("phone", "unknown_client")
-    client_id_str = websocket.query_params.get("client_id", "")
-    company_context = websocket.query_params.get("company_context", "")
-    
     # ── Database Pre-fetch (Moved from handle_inbound_call) ──
     previous_summary = ""
     if client_id_str:
         try:
             from app.db.connection import db_manager
             from app.repositories.session_repository import SessionRepository
+            import uuid
             async with db_manager.get_session() as db:
-                summary_text = await SessionRepository.get_summary(db, client_id_str)
+                client_uuid = uuid.UUID(client_id_str)
+                summary_text = await SessionRepository.get_summary(db, client_uuid)
                 if summary_text:
+                    logger.info(f"Retrieved DB summary for {client_uuid}: {summary_text[:50]}...")
                     previous_summary = summary_text
         except Exception as e:
             logger.error(f"Failed to fetch summary in websocket: {e}")
@@ -171,7 +219,8 @@ async def websocket_endpoint(websocket: WebSocket):
         phone_number=phone_number, 
         company_context=company_context,
         client_id_str=client_id_str,
-        previous_summary=previous_summary
+        previous_summary=previous_summary,
+        connection_metrics=connection_metrics
     )
 
 
@@ -181,7 +230,8 @@ async def run_voice_session(
     phone_number: str = "unknown_client", 
     company_context: str = "",
     client_id_str: str = "",
-    previous_summary: str = ""
+    previous_summary: str = "",
+    connection_metrics: dict = None
 ) -> None:
     """Bootstrap and execute a single real-time voice session."""
 
@@ -197,7 +247,8 @@ async def run_voice_session(
     "phone_number": phone_number
     })
     session_id = session.session_id
-    logger.info("Session created | session_id={sid} | client={client}", sid=session_id, client=phone_number)
+    masked_phone = f"{phone_number[:3]}******{phone_number[-4:]}" if len(phone_number) > 7 and phone_number != "unknown_client" else phone_number
+    logger.info("Session created | session_id={sid} | client={client}", sid=session_id, client=masked_phone)
     
     # Persist the Session in DB
     if client_id_str:
@@ -235,9 +286,10 @@ async def run_voice_session(
                 fallback_phone = sess_data.metadata.get("phone_number") or "unknown_client"
                 fallback_client = await ClientRepository.get_or_create_client(db_session, fallback_phone)
                 c_id = fallback_client.id
+                masked_fallback = f"{fallback_phone[:3]}******{fallback_phone[-4:]}" if len(fallback_phone) > 7 and fallback_phone != "unknown_client" else fallback_phone
                 logger.warning(
                     "client_id was missing in session metadata for {sid}; fell back to phone_number lookup ({phone})",
-                    sid=event.session_id, phone=fallback_phone,
+                    sid=event.session_id, phone=masked_fallback,
                 )
 
             if c_id:
@@ -262,7 +314,8 @@ async def run_voice_session(
                     "Combine the previous summary with the new call transcript below into ONE "
                     "updated summary. Keep it concise (3-5 sentences), factual, and focused on "
                     "details useful for future calls (who they are, what they asked about, any "
-                    "preferences or unresolved issues). Do not include greetings or small talk.\n\n"
+                    "preferences or unresolved issues). Do not include greetings or small talk. "
+                    "If there is no meaningful conversation, do NOT speculate about technical glitches or silent calls, just state that no new information was gathered.\n\n"
                     f"Previous summary:\n{prev_summary_text if prev_summary_text else '(none, first call)'}\n\n"
                     f"New call transcript:\n{transcript if transcript else '(no conversation recorded)'}"
                 )
@@ -311,20 +364,32 @@ async def run_voice_session(
         await broadcast_frontend_event("greeting_complete")
 
     async def on_transcript_ready(e: TranscriptReady):
+        if e.session_id != session_id:
+            return
+        text = e.payload.get("text", "")
+        if text:
+            await session_manager.add_message(session_id, role="user", content=text)
         await broadcast_frontend_event("transcription_received", {
-            "text": e.payload.get("transcript", ""),
+            "text": text,
             "language": e.payload.get("language", "unknown"),
             "latency_ms": e.payload.get("latency_ms", 0)
         })
         
     async def on_thinking_started(e: ThinkingStarted):
+        if e.session_id != session_id:
+            return
         await broadcast_frontend_event("llm_response_generating", {
             "latency_so_far_ms": e.payload.get("latency_so_far_ms", 0)
         })
 
     async def on_response_generated(e: ResponseGenerated):
+        if e.session_id != session_id:
+            return
+        text = e.payload.get("text", "")
+        if text:
+            await session_manager.add_message(session_id, role="assistant", content=text)
         await broadcast_frontend_event("llm_response_complete", {
-            "response_text": e.payload.get("response", ""),
+            "response_text": text,
             "latency_ms": e.payload.get("latency_ms", 0)
         })
 
@@ -396,6 +461,7 @@ async def run_voice_session(
         transport=transport,
         fsm=fsm,
         latency_tracker=latency_tracker,
+        previous_summary=previous_summary,
     )
     logger.info("PipecatAdapter ready | execution_id={eid}", eid=execution_id)
 
@@ -422,8 +488,8 @@ async def run_voice_session(
 
         try:
             fsm.close(reason="pipeline finished")
-        except Exception:
-            pass 
+        except Exception as e:
+            logger.exception("Failed to close FSM cleanly")
 
         await session_manager.set_state(session_id, SessionState.CLOSED)
         event_bus.publish_sync(SessionClosed(session_id=session_id))
@@ -434,11 +500,10 @@ async def run_voice_session(
         logger.info("Session closed | session_id={sid}", sid=session_id)
         
         # Dump latency profiles
-        import app.main
-        for k, v in app.main.global_timers.items():
-            # Only log remaining global connection metrics
-            logger.info(f"[LATENCY] {k} = {v}")
-        app.main.global_timers.clear()
+        if connection_metrics:
+            for k, v in connection_metrics.items():
+                # Only log remaining global connection metrics
+                logger.info(f"[LATENCY] {k} = {v}")
         
         # Print turn-by-turn benchmark summary
         latency_tracker.print_summary()

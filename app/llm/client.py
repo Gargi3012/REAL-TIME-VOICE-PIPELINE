@@ -14,23 +14,24 @@ class GroqLLMClient:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "llama-3.3-70b-versatile",
+        model: Optional[str] = None,
     ) -> None:
         """Initialise the Groq LLM client.
 
         Args:
             api_key: Optional Groq API key. If not provided, it is read
                      from the GROQ_API_KEY environment variable.
-            model: Model identifier, defaults to "llama-3.3-70b-versatile".
+            model: Optional Model identifier. If not provided, it is read
+                   from GROQ_MODEL, defaulting to "llama-3.1-8b-instant".
         """
         self.api_key = api_key or os.environ.get("GROQ_API_KEY")
+        self.model = model or os.environ.get("GROQ_MODEL", "llama-3.1-8b-instant")
         if not self.api_key:
             logger.error("Failed to initialise GroqLLMClient: GROQ_API_KEY is not set.")
             raise ValueError(
                 "GROQ_API_KEY is not set. Please set the GROQ_API_KEY environment variable."
             )
 
-        self.model = model
         self.client = AsyncGroq(api_key=self.api_key)
         logger.info(
             "GroqLLMClient initialised successfully | model={model}",

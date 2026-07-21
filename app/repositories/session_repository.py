@@ -55,8 +55,10 @@ class SessionRepository:
         result = await session.execute(stmt)
         summary_record = result.scalars().first()
 
+        from datetime import datetime, timezone
         if summary_record:
             summary_record.summary = summary_text
+            summary_record.updated_at = datetime.now(timezone.utc)
         else:
             summary_record = ConversationSummary(client_id=client_id, summary=summary_text)
             session.add(summary_record)
