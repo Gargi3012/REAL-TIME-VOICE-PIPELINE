@@ -81,3 +81,60 @@ class GroqLLMClient:
         except Exception as e:
             logger.error("Error occurred while streaming from Groq API: {error}", error=e)
             raise
+
+
+class OpenAILLMClient:
+    """Client for OpenAI LLM API, designed for real-time streaming completions."""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> None:
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self.model = model or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        if not self.api_key:
+            logger.error("Failed to initialise OpenAILLMClient: OPENAI_API_KEY is not set.")
+            raise ValueError(
+                "OPENAI_API_KEY is not set. Please set the OPENAI_API_KEY environment variable."
+            )
+
+        from openai import AsyncOpenAI
+        self.client = AsyncOpenAI(api_key=self.api_key)
+        logger.info(
+            "OpenAILLMClient initialised successfully | model={model}",
+            model=self.model,
+        )
+
+    async def stream_response(
+        self,
+        messages: List[Message],
+    ) -> AsyncGenerator[str, None]:
+        if not messages:
+            logger.warning("stream_response called with empty message history.")
+            return
+
+        formatted_messages = [
+            {"role": msg.role, "content": msg.content} for msg in messages
+        ]
+
+        logger.debug(
+            "Sending chat completion request to OpenAI | model={model} | messages={count}",
+            model=self.model,
+            count=len(formatted_messages),
+        )
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=formatted_messages,  # type: ignore
+                stream=True,
+            )
+
+            async for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        except Exception as e:
+            logger.error("Error occurred while streaming from OpenAI API: {error}", error=e)
+            raise

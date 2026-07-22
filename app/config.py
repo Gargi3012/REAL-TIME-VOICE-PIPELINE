@@ -29,9 +29,16 @@ LIVEKIT_ROOM_NAME: str = os.getenv("LIVEKIT_ROOM_NAME", "default-voice-room")
 # ── Deepgram (Speech-to-Text) ──────────────────────────────────────────
 DEEPGRAM_API_KEY: str = os.getenv("DEEPGRAM_API_KEY", "")
 
+# ── LLM Provider Selection ─────────────────────────────────────────────
+LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # "openai" | "groq"
+
 # ── Groq (LLM) ────────────────────────────────────────────────────────
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+
+# ── OpenAI (LLM) ──────────────────────────────────────────────────────
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # ── ElevenLabs (Text-to-Speech) ───────────────────────────────────────
 ELEVEN_LABS_API_KEY: str = os.getenv("ELEVEN_LABS_API_KEY", "")

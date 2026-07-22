@@ -91,18 +91,35 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
         return stt
 
     elif role == ProcessorRole.LLM:
-        from pipecat.services.groq.llm import GroqLLMService
-
-        if not GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY is not set in your .env file.")
-
-        model = metadata.get("model", GROQ_MODEL)
-        llm = GroqLLMService(
-            api_key=GROQ_API_KEY,
-            settings=GroqLLMService.Settings(model=model),
-        )
-        logger.info("GroqLLMService created | model={m}", m=model)
-        return llm
+        from app.config import LLM_PROVIDER
+        
+        if LLM_PROVIDER.lower() == "openai":
+            from pipecat.services.openai.llm import OpenAILLMService
+            from app.config import OPENAI_API_KEY, OPENAI_MODEL
+            
+            if not OPENAI_API_KEY:
+                raise ValueError("OPENAI_API_KEY is not set in your .env file.")
+                
+            model = metadata.get("model", OPENAI_MODEL)
+            llm = OpenAILLMService(
+                api_key=OPENAI_API_KEY,
+                model=model,
+            )
+            logger.info("OpenAILLMService created | model={m}", m=model)
+            return llm
+        else:
+            from pipecat.services.groq.llm import GroqLLMService
+    
+            if not GROQ_API_KEY:
+                raise ValueError("GROQ_API_KEY is not set in your .env file.")
+    
+            model = metadata.get("model", GROQ_MODEL)
+            llm = GroqLLMService(
+                api_key=GROQ_API_KEY,
+                settings=GroqLLMService.Settings(model=model),
+            )
+            logger.info("GroqLLMService created | model={m}", m=model)
+            return llm
 
     elif role == ProcessorRole.TTS:
         from app.config import TTS_PROVIDER, TRANSPORT_MODE

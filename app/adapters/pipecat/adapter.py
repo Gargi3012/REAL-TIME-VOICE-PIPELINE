@@ -91,10 +91,11 @@ def _build_real_pipeline_task(
     # 2. Core processors (STT → LLM → TTS) from the mapper
     # We must wire up the OpenAILLMContext and aggregator for the LLM
     from pipecat.services.groq.llm import GroqLLMService
+    from pipecat.services.openai.llm import OpenAILLMService
     from pipecat.pipeline.pipeline import Pipeline as PipecatPipeline
     
     # We need to find the LLM to attach the aggregator
-    llm = next((p for p in pipecat_processors if isinstance(p, GroqLLMService)), None)
+    llm = next((p for p in pipecat_processors if isinstance(p, (GroqLLMService, OpenAILLMService))), None)
     
     if llm:
         from pipecat.processors.aggregators.llm_context import LLMContext
@@ -170,7 +171,7 @@ def _build_real_pipeline_task(
         filler_processor = LatencyFillerProcessor(filler_wav_paths=filler_wavs, delay_threshold_ms=400)
         
         for p in pipecat_processors:
-            if isinstance(p, GroqLLMService):
+            if isinstance(p, (GroqLLMService, OpenAILLMService)):
                 new_processors.append(LanguageRoutingProcessor(shared_state=shared_state))
                 new_processors.append(user_agg)
                 new_processors.append(filler_processor)

@@ -297,7 +297,7 @@ async def run_voice_session(
                 # Mock LLM Summary Generation (in real prod, call an LLM API here with transcript)
                 # Real LLM Summary Generation — combines previous summary + this call's
                 # transcript into one updated, concise summary (overwrites the old one).
-                from app.llm.client import GroqLLMClient
+                from app.config import LLM_PROVIDER
                 from app.session.message import Message
 
                 history_texts = [
@@ -321,7 +321,13 @@ async def run_voice_session(
                 )
 
                 try:
-                    summary_client = GroqLLMClient()
+                    if LLM_PROVIDER.lower() == "openai":
+                        from app.llm.client import OpenAILLMClient
+                        summary_client = OpenAILLMClient()
+                    else:
+                        from app.llm.client import GroqLLMClient
+                        summary_client = GroqLLMClient()
+                        
                     summary_messages = [
                         Message(role="system", content="You write concise caller memory summaries."),
                         Message(role="user", content=summary_prompt),
