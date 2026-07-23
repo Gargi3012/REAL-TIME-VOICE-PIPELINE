@@ -349,7 +349,8 @@ async def run_voice_session(
                 await SessionRepository.close_session(db_session, event.session_id, int(sess_data.duration_seconds))
                 logger.info("Persisted call summary and closed DB session for {sid}", sid=event.session_id)
 
-    await event_bus.subscribe("SessionClosed", on_session_closed)
+    sub_ids = []
+    sub_ids.append(await event_bus.subscribe("SessionClosed", on_session_closed))
                 
     await event_bus.start()
     event_bus.publish_sync(SessionCreated(session_id=session_id))
@@ -416,14 +417,14 @@ async def run_voice_session(
             "component": e.payload.get("component", "unknown")
         })
 
-    await event_bus.subscribe("AssistantGreetingStarted", on_greeting_started)
-    await event_bus.subscribe("AssistantGreetingCompleted", on_greeting_completed)
-    await event_bus.subscribe("TranscriptReady", on_transcript_ready)
-    await event_bus.subscribe("ThinkingStarted", on_thinking_started)
-    await event_bus.subscribe("ResponseGenerated", on_response_generated)
-    await event_bus.subscribe("SpeakingStarted", on_speaking_started)
-    await event_bus.subscribe("SpeakingFinished", on_speaking_finished)
-    await event_bus.subscribe("ErrorOccurred", on_error)
+    sub_ids.append(await event_bus.subscribe("AssistantGreetingStarted", on_greeting_started))
+    sub_ids.append(await event_bus.subscribe("AssistantGreetingCompleted", on_greeting_completed))
+    sub_ids.append(await event_bus.subscribe("TranscriptReady", on_transcript_ready))
+    sub_ids.append(await event_bus.subscribe("ThinkingStarted", on_thinking_started))
+    sub_ids.append(await event_bus.subscribe("ResponseGenerated", on_response_generated))
+    sub_ids.append(await event_bus.subscribe("SpeakingStarted", on_speaking_started))
+    sub_ids.append(await event_bus.subscribe("SpeakingFinished", on_speaking_finished))
+    sub_ids.append(await event_bus.subscribe("ErrorOccurred", on_error))
 
     # ── 3. Conversation FSM ─────────────────────────────────────────────
     fsm = ConversationStateMachine(session_id=session_id)
@@ -471,6 +472,15 @@ async def run_voice_session(
     )
     logger.info("PipecatAdapter ready | execution_id={eid}", eid=execution_id)
 
+    if TRANSPORT_MODE.lower() == "livekit":
+        raw_transport = transport.get_pipecat_transport()
+        @raw_transport.event_handler("on_participant_disconnected")
+        async def on_participant_disconnected(transport_instance, participant_id):
+            logger.info("Participant {pid} disconnected. Queueing EndFrame to close pipeline.", pid=participant_id)
+            from pipecat.frames.frames import EndFrame
+            if adapter.task:
+                await adapter.task.queue_frame(EndFrame())
+
     # ── 8. Update session state ─────────────────────────────────────────
     await session_manager.set_state(session_id, SessionState.LISTENING)
 
@@ -502,8 +512,18 @@ async def run_voice_session(
         await event_bus._queue.join()  # Wait for SessionClosed to be processed (persists summary) before stopping
 
 
+        # Unsubscribe event listeners for this session
+        for sub_id in sub_ids:
+            try:
+                await event_bus.unsubscribe(sub_id)
+            except Exception as e:
+                logger.warning("Failed to unsubscribe handler {sub_id}: {e}", sub_id=sub_id, e=e)
+
         await event_bus.stop()
-        logger.info("Session closed | session_id={sid}", sid=session_id)
+
+        # Delete session from temporary SessionManager RAM store (Neon DB records remain saved)
+        await session_manager.delete_session(session_id)
+        logger.info("Session closed and temporary RAM cleaned | session_id={sid}", sid=session_id)
         
         # Dump latency profiles
         if connection_metrics:
