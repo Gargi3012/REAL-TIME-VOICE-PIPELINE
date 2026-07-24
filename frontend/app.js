@@ -12,6 +12,7 @@ class UIManager {
         this.visualizer = document.getElementById('audio-visualizer');
         this.latencyEl = document.getElementById('metric-latency');
         this.languageEl = document.getElementById('metric-language');
+        this.emotionEl = document.getElementById('metric-emotion');
         this.toastContainer = document.getElementById('toast-container');
         this.twilioOverlay = document.getElementById('twilio-overlay');
         this.transportIndicator = document.getElementById('transport-mode-indicator');
@@ -70,7 +71,7 @@ class UIManager {
         }
     }
 
-    updateMetrics(latency, language) {
+    updateMetrics(latency, language, emotion) {
         if (latency !== undefined) {
             this.latencyEl.textContent = `${latency}ms`;
             if (latency > 1000) {
@@ -81,6 +82,13 @@ class UIManager {
         }
         if (language !== undefined) {
             this.languageEl.textContent = language;
+        }
+        if (emotion !== undefined && this.emotionEl) {
+            const emojiMap = { 'Happy': '😊', 'Frustrated': '😠', 'Confused': '🤔', 'Neutral': '😐' };
+            const displayEmotion = emojiMap[emotion] ? `${emotion} ${emojiMap[emotion]}` : emotion;
+            this.emotionEl.textContent = displayEmotion;
+            const emotionClass = emotion.split(' ')[0].toLowerCase();
+            this.emotionEl.className = `metric-value ${emotionClass}`;
         }
     }
 
@@ -100,6 +108,11 @@ class UIManager {
         }
         if (meta && meta.language) {
             metaHtml += `<span>🗣 ${meta.language}</span>`;
+        }
+        if (meta && meta.emotion) {
+            const emojiMap = { 'Happy': '😊', 'Frustrated': '😠', 'Confused': '🤔', 'Neutral': '😐' };
+            const displayEmotion = emojiMap[meta.emotion] ? `${meta.emotion} ${emojiMap[meta.emotion]}` : meta.emotion;
+            metaHtml += `<span>🎭 ${displayEmotion}</span>`;
         }
 
         msgDiv.innerHTML = `
@@ -198,9 +211,10 @@ class VoicePipelineClient {
             case 'transcription_received':
                 this.ui.addMessage('You', data.text, { 
                     latency: data.latency_ms,
-                    language: data.language
+                    language: data.language,
+                    emotion: data.emotion
                 });
-                this.ui.updateMetrics(undefined, data.language);
+                this.ui.updateMetrics(undefined, data.language, data.emotion);
                 this.ui.setStatus('Processing STT...', true, false);
                 break;
             case 'llm_response_generating':

@@ -387,15 +387,36 @@ async def run_voice_session(
         if e.session_id != session_id:
             return
         text = e.payload.get("text", "")
+        emotion = "Neutral"  # no emoji — Windows logger can't handle emoji
+        detected_lang = "unknown"
         if text:
             # Strip any [System: ...] prompt engineering suffixes just in case
             import re
             text = re.sub(r'\s*\[System:.*?\]', '', text, flags=re.DOTALL).strip()
+            logger.info(f"on_transcript_ready: cleaned_text='{text}'")
+            
+            # Detect language from the raw text (before stripping)
+            devanagari_count = len(re.findall(r'[\u0900-\u097F]', text))
+            hinglish_indicators = {'hai','mujhe','kya','kaise','chahiye','mera','ko','se','mein','kar','hu','tha','sakte','batao','koi','nahi','haan','rha'}
+            words = set(re.findall(r'\b\w+\b', text.lower()))
+            if devanagari_count > 10:
+                detected_lang = "Hindi"
+            elif len(words.intersection(hinglish_indicators)) >= 1:
+                detected_lang = "Hinglish"
+            else:
+                detected_lang = "English"
+
+            # Analyze user emotion
+            from app.services.emotion_analyzer import analyze_emotion
+            emotion = analyze_emotion(text)
+            logger.info(f"on_transcript_ready: lang={detected_lang} | emotion={emotion}")
+            
             await session_manager.add_message(session_id, role="user", content=text)
         await broadcast_frontend_event("transcription_received", {
             "text": text,
-            "language": e.payload.get("language", "unknown"),
-            "latency_ms": e.payload.get("latency_ms", 0)
+            "language": detected_lang,
+            "latency_ms": e.payload.get("latency_ms", 0),
+            "emotion": emotion
         })
         
     async def on_thinking_started(e: ThinkingStarted):
@@ -410,12 +431,24 @@ async def run_voice_session(
             return
         text = e.payload.get("text", "")
         if text:
-            await session_manager.add_message(session_id, role="assistant", content=text)
-        await broadcast_frontend_event("llm_response_complete", {
-            "response_text": text,
-            "full_text": text,
-            "latency_ms": e.payload.get("latency_ms", 0)
-        })
+            # Clean up function tags and JSON parameters from history text
+            import re
+            cleaned_text = re.sub(r'(?:\(|<)?\s*function=save_lead.*?(?:\s*<\/function>|\s*\)|>)?', '', text, flags=re.DOTALL).strip()
+            cleaned_text = cleaned_text.replace("</function>", "").strip()
+            
+            await session_manager.add_message(session_id, role="assistant", content=cleaned_text)
+            
+            await broadcast_frontend_event("llm_response_complete", {
+                "response_text": cleaned_text,
+                "full_text": cleaned_text,
+                "latency_ms": e.payload.get("latency_ms", 0)
+            })
+        else:
+            await broadcast_frontend_event("llm_response_complete", {
+                "response_text": "",
+                "full_text": "",
+                "latency_ms": e.payload.get("latency_ms", 0)
+            })
 
     async def on_speaking_started(e: SpeakingStarted):
         await broadcast_frontend_event("tts_playing", {

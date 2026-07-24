@@ -154,10 +154,11 @@ def _build_real_pipeline_task(
         user_agg = LLMUserAggregator(context, params=agg_params)
         asst_agg = LLMAssistantAggregator(context)
         
-        # Build the exact Pipecat sequence: [stt, language_router, user_agg, llm, tts, call_terminator, asst_agg]
+        # Build the exact Pipecat sequence: [stt, language_router, user_agg, llm, tool_interceptor, tts, call_terminator, asst_agg]
         new_processors = []
         shared_state = {}
         from app.adapters.pipecat.language_router import LanguageRoutingProcessor, CallTerminationProcessor
+        from app.adapters.pipecat.tool_interceptor import ToolInterceptionProcessor
         from app.adapters.pipecat.filler_processor import LatencyFillerProcessor
         
         # Add filler processor with multiple Cartesia-generated wavs
@@ -176,6 +177,7 @@ def _build_real_pipeline_task(
                 new_processors.append(user_agg)
                 new_processors.append(filler_processor)
                 new_processors.append(p)
+                new_processors.append(ToolInterceptionProcessor())
             elif p.__class__.__name__.endswith("TTSService"):
                 new_processors.append(p)
                 new_processors.append(CallTerminationProcessor(shared_state=shared_state))
@@ -200,17 +202,18 @@ def _build_real_pipeline_task(
             super().__init__()
             self.context = context
             self._current_llm_response = ""
-            self._processed_transcription_ids = set()
 
         async def on_push_frame(self, data: FramePushed):
             frame = data.frame
+            source_class = data.source.__class__.__name__
             now = time.perf_counter()
             from pipecat.frames.frames import (
                 TranscriptionFrame, LLMFullResponseStartFrame, LLMFullResponseEndFrame, TextFrame,
                 TTSStartedFrame, TTSStoppedFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame
             )
             
-            if isinstance(frame, TextFrame):
+            # Accumulate LLM response text only when pushed directly from the LLM processor
+            if isinstance(frame, TextFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
                 self._current_llm_response += frame.text
             
             if isinstance(frame, UserStartedSpeakingFrame):
@@ -222,28 +225,27 @@ def _build_real_pipeline_task(
                 if latency_tracker:
                     latency_tracker.on_vad_stop()
                 
-            elif isinstance(frame, TranscriptionFrame) and frame.text:
-                frame_id = id(frame)
-                if frame_id not in self._processed_transcription_ids:
-                    self._processed_transcription_ids.add(frame_id)
-                    if latency_tracker:
-                        latency_tracker.on_stt_transcript()
-                    # Strip [System: ...] prompt engineering blocks to keep the UI and database history clean
-                    import re
-                    clean_text = re.sub(r'\s*\[System:.*?\]', '', frame.text, flags=re.DOTALL).strip()
-                    bridge.on_transcript_ready(clean_text)
-                
-            elif isinstance(frame, LLMFullResponseStartFrame):
+            # Emit transcript only when pushed directly from the STT processor
+            elif isinstance(frame, TranscriptionFrame) and frame.text and source_class in ("DeepgramSTTService", "GroqSTTService", "OpenAISTTService", "ResilientSTTProcessor", "MockPipecatProcessor"):
+                if latency_tracker:
+                    latency_tracker.on_stt_transcript()
+                # Strip [System: ...] prompt engineering blocks to keep the UI and database history clean
+                import re
+                clean_text = re.sub(r'\s*\[System:.*?\]', '', frame.text, flags=re.DOTALL).strip()
+                bridge.on_transcript_ready(clean_text)
+                # Note: transcription_received event is broadcast by main.py's on_transcript_ready
+                # handler (subscribed to TranscriptReady event bus event) with emotion + language.
+
+            elif isinstance(frame, LLMFullResponseStartFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
                 if latency_tracker:
                     latency_tracker.on_llm_first_token()
                 bridge.on_llm_response_started()
                     
-            elif isinstance(frame, LLMFullResponseEndFrame):
+            elif isinstance(frame, LLMFullResponseEndFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
                 if latency_tracker:
                     latency_tracker.on_llm_complete()
                 
-                # We only want to emit once per complete response. Since the observer
-                # sees the frame multiple times (from each processor), we emit and clear.
+                # Emit LLM response complete only once
                 if self._current_llm_response:
                     bridge.on_llm_response_ready(self._current_llm_response)
                     self._current_llm_response = ""

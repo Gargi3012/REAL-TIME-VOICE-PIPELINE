@@ -186,6 +186,10 @@ h1 {
 .metric-value { font-weight: 600; }
 .metric-value.good { color: var(--status-success); }
 .metric-value.bad { color: var(--status-error); }
+.metric-value.happy { color: #198754; font-weight: 700; text-shadow: 0 0 10px rgba(25, 135, 84, 0.1); }
+.metric-value.angry, .metric-value.frustrated { color: #dc3545; font-weight: 700; text-shadow: 0 0 10px rgba(220, 53, 69, 0.1); }
+.metric-value.confused { color: #fd7e14; font-weight: 700; text-shadow: 0 0 10px rgba(253, 126, 20, 0.1); }
+.metric-value.neutral { color: #6c757d; font-weight: 600; }
 
 /* Chat History */
 .chat-history {
