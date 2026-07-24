@@ -214,14 +214,27 @@ async def websocket_endpoint(websocket: WebSocket):
             logger.error(f"Failed to fetch summary in websocket: {e}")
     
     # Block and run the voice session on this websocket
-    await run_voice_session(
-        transport=transport, 
-        phone_number=phone_number, 
-        company_context=company_context,
-        client_id_str=client_id_str,
-        previous_summary=previous_summary,
-        connection_metrics=connection_metrics
-    )
+    try:
+        await run_voice_session(
+            transport=transport, 
+            phone_number=phone_number, 
+            company_context=company_context,
+            client_id_str=client_id_str,
+            previous_summary=previous_summary,
+            connection_metrics=connection_metrics
+        )
+    except WebSocketDisconnect as e:
+        logger.warning(f"Twilio WebSocket disconnected in endpoint: code={e.code}, reason={e.reason}")
+    except Exception as exc:
+        logger.exception(f"Unhandled exception in websocket endpoint: {exc}")
+    finally:
+        try:
+            from fastapi.websockets import WebSocketState
+            if websocket.client_state != WebSocketState.DISCONNECTED:
+                logger.info("Closing Twilio WebSocket connection gracefully")
+                await websocket.close()
+        except Exception as close_err:
+            logger.warning(f"Error while closing Twilio WebSocket: {close_err}")
 
 
 # ── Core Pipeline Session ───────────────────────────────────────────────
@@ -490,8 +503,8 @@ async def run_voice_session(
         # P0 Fix: Enforce wait_for to prevent infinite hangs if supported, or just catch disconnects
         await adapter.run()
 
-    except WebSocketDisconnect:
-        logger.warning("Twilio WebSocket disconnected abruptly.")
+    except WebSocketDisconnect as e:
+        logger.warning(f"Twilio WebSocket disconnected abruptly: code={e.code}, reason={e.reason}")
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt — shutting down gracefully")
     except Exception as exc:
