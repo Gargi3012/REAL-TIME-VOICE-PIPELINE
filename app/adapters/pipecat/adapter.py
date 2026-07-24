@@ -83,10 +83,10 @@ def _build_real_pipeline_task(
         processors.append(real_transport.input())
         
         # In Pipecat 1.5.0, VAD is a separate processor that must be injected manually
+        # We use the fine-tuned VAD analyzer from Pillar 2.
         from pipecat.processors.audio.vad_processor import VADProcessor
-        from pipecat.audio.vad.vad_analyzer import VADParams
-        from pipecat.audio.vad.silero import SileroVADAnalyzer
-        processors.append(VADProcessor(vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2))))
+        from app.adapters.pipecat.transport import _build_vad_analyzer
+        processors.append(VADProcessor(vad_analyzer=_build_vad_analyzer()))
 
     # 2. Core processors (STT → LLM → TTS) from the mapper
     # We must wire up the OpenAILLMContext and aggregator for the LLM
@@ -95,7 +95,7 @@ def _build_real_pipeline_task(
     from pipecat.pipeline.pipeline import Pipeline as PipecatPipeline
     
     # We need to find the LLM to attach the aggregator
-    llm = next((p for p in pipecat_processors if isinstance(p, (GroqLLMService, OpenAILLMService))), None)
+    llm = next((p for p in pipecat_processors if isinstance(p, (GroqLLMService, OpenAILLMService)) or p.__class__.__name__ == "ResilientLLMProcessor"), None)
     
     if llm:
         from pipecat.processors.aggregators.llm_context import LLMContext
@@ -154,10 +154,11 @@ def _build_real_pipeline_task(
         user_agg = LLMUserAggregator(context, params=agg_params)
         asst_agg = LLMAssistantAggregator(context)
         
-        # Build the exact Pipecat sequence: [stt, language_router, user_agg, llm, tts, call_terminator, asst_agg]
+        # Build the exact Pipecat sequence: [stt, language_router, user_agg, llm, tool_interceptor, tts, call_terminator, asst_agg]
         new_processors = []
         shared_state = {}
         from app.adapters.pipecat.language_router import LanguageRoutingProcessor, CallTerminationProcessor
+        from app.adapters.pipecat.tool_interceptor import ToolInterceptionProcessor
         from app.adapters.pipecat.filler_processor import LatencyFillerProcessor
         
         # Add filler processor with multiple Cartesia-generated wavs
@@ -171,11 +172,12 @@ def _build_real_pipeline_task(
         filler_processor = LatencyFillerProcessor(filler_wav_paths=filler_wavs, delay_threshold_ms=400)
         
         for p in pipecat_processors:
-            if isinstance(p, (GroqLLMService, OpenAILLMService)):
+            if isinstance(p, (GroqLLMService, OpenAILLMService)) or p.__class__.__name__ == "ResilientLLMProcessor":
                 new_processors.append(LanguageRoutingProcessor(shared_state=shared_state))
                 new_processors.append(user_agg)
                 new_processors.append(filler_processor)
                 new_processors.append(p)
+                new_processors.append(ToolInterceptionProcessor())
             elif p.__class__.__name__.endswith("TTSService"):
                 new_processors.append(p)
                 new_processors.append(CallTerminationProcessor(shared_state=shared_state))
@@ -203,13 +205,15 @@ def _build_real_pipeline_task(
 
         async def on_push_frame(self, data: FramePushed):
             frame = data.frame
+            source_class = data.source.__class__.__name__
             now = time.perf_counter()
             from pipecat.frames.frames import (
                 TranscriptionFrame, LLMFullResponseStartFrame, LLMFullResponseEndFrame, TextFrame,
                 TTSStartedFrame, TTSStoppedFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame
             )
             
-            if isinstance(frame, TextFrame):
+            # Accumulate LLM response text only when pushed directly from the LLM processor
+            if isinstance(frame, TextFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
                 self._current_llm_response += frame.text
             
             if isinstance(frame, UserStartedSpeakingFrame):
@@ -221,22 +225,27 @@ def _build_real_pipeline_task(
                 if latency_tracker:
                     latency_tracker.on_vad_stop()
                 
-            elif isinstance(frame, TranscriptionFrame) and frame.text:
+            # Emit transcript only when pushed directly from the STT processor
+            elif isinstance(frame, TranscriptionFrame) and frame.text and source_class in ("DeepgramSTTService", "GroqSTTService", "OpenAISTTService", "ResilientSTTProcessor", "MockPipecatProcessor"):
                 if latency_tracker:
                     latency_tracker.on_stt_transcript()
-                bridge.on_transcript_ready(frame.text)
-                
-            elif isinstance(frame, LLMFullResponseStartFrame):
+                # Strip [System: ...] prompt engineering blocks to keep the UI and database history clean
+                import re
+                clean_text = re.sub(r'\s*\[System:.*?\]', '', frame.text, flags=re.DOTALL).strip()
+                bridge.on_transcript_ready(clean_text)
+                # Note: transcription_received event is broadcast by main.py's on_transcript_ready
+                # handler (subscribed to TranscriptReady event bus event) with emotion + language.
+
+            elif isinstance(frame, LLMFullResponseStartFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
                 if latency_tracker:
                     latency_tracker.on_llm_first_token()
                 bridge.on_llm_response_started()
                     
-            elif isinstance(frame, LLMFullResponseEndFrame):
+            elif isinstance(frame, LLMFullResponseEndFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
                 if latency_tracker:
                     latency_tracker.on_llm_complete()
                 
-                # We only want to emit once per complete response. Since the observer
-                # sees the frame multiple times (from each processor), we emit and clear.
+                # Emit LLM response complete only once
                 if self._current_llm_response:
                     bridge.on_llm_response_ready(self._current_llm_response)
                     self._current_llm_response = ""

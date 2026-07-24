@@ -29,6 +29,153 @@ class PipecatProcessorAdapter:
 
 # ── Fallback mock (used in tests / when pipecat-ai is not installed) ──
 
+try:
+    from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
+    from pipecat.frames.frames import StartFrame, SystemFrame
+    
+    class ResilientSTTProcessor(FrameProcessor):
+        """Proxy processor that delegates to primary STT and falls back to Whisper STT on error."""
+        def __init__(self, primary_stt, fallback_factory):
+            super().__init__()
+            self.primary_stt = primary_stt
+            self.fallback_factory = fallback_factory
+            self.active_stt = primary_stt
+            self.fallback_active = False
+
+        def link(self, processor):
+            super().link(processor)
+            self.primary_stt.link(processor)
+            if self.fallback_active and self.active_stt:
+                self.active_stt.link(processor)
+
+        async def setup(self, setup):
+            await super().setup(setup)
+            await self.primary_stt.setup(setup)
+
+        async def cleanup(self):
+            await super().cleanup()
+            await self.active_stt.cleanup()
+
+        async def process_frame(self, frame, direction):
+            # Capture StartFrame so we can replay it for fallback initialization
+            if isinstance(frame, StartFrame):
+                self._start_frame = frame
+
+            # Propagate system frame lifecycle (like setting __started = True)
+            if isinstance(frame, SystemFrame):
+                await super().process_frame(frame, direction)
+
+            try:
+                await self.active_stt.process_frame(frame, direction)
+            except Exception as e:
+                await self.trigger_stt_fallback(e)
+                if self.fallback_active:
+                    await self.active_stt.queue_frame(frame, direction)
+
+        async def trigger_stt_fallback(self, error):
+            if not self.fallback_active:
+                logger.error(f"Primary STT failed: {error}. Switching to Whisper fallback STT.")
+                self.fallback_active = True
+                try:
+                    self.active_stt = self.fallback_factory()
+                    self.active_stt.link(self._next)
+                    
+                    # Initialize fallback STT variables and boot its tasks
+                    from pipecat.processors.frame_processor import FrameProcessorSetup
+                    setup = FrameProcessorSetup(
+                        clock=self._clock,
+                        task_manager=self._task_manager,
+                        pipeline_worker=self._pipeline_worker,
+                        observer=self._observer,
+                    )
+                    await self.active_stt.setup(setup)
+                    self.active_stt._FrameProcessor__started = True
+                    
+                    # Replay StartFrame to start fallback STT
+                    if hasattr(self, "_start_frame"):
+                        await self.active_stt.queue_frame(self._start_frame, FrameDirection.DOWNSTREAM)
+                    
+                    from pipecat.frames.frames import TTSSpeakFrame, BotStoppedSpeakingFrame
+                    await self.push_frame(TTSSpeakFrame(text="Connecting to backup speech recognition. Please repeat."))
+                    await self.push_frame(BotStoppedSpeakingFrame())
+                except Exception as fallback_err:
+                    logger.error(f"Fallback STT also failed: {fallback_err}")
+
+    class ResilientLLMProcessor(FrameProcessor):
+        """Proxy processor that delegates to primary LLM and falls back to Groq/OpenAI LLM on error."""
+        def __init__(self, primary_llm, fallback_factory):
+            super().__init__()
+            self.primary_llm = primary_llm
+            self.fallback_factory = fallback_factory
+            self.active_llm = primary_llm
+            self.fallback_active = False
+
+        def link(self, processor):
+            super().link(processor)
+            self.primary_llm.link(processor)
+            if self.fallback_active and self.active_llm:
+                self.active_llm.link(processor)
+
+        async def setup(self, setup):
+            await super().setup(setup)
+            await self.primary_llm.setup(setup)
+
+        async def cleanup(self):
+            await super().cleanup()
+            await self.active_llm.cleanup()
+
+        async def process_frame(self, frame, direction):
+            # Capture StartFrame so we can replay it for fallback initialization
+            if isinstance(frame, StartFrame):
+                self._start_frame = frame
+
+            # Propagate system frame lifecycle (like setting __started = True)
+            if isinstance(frame, SystemFrame):
+                await super().process_frame(frame, direction)
+
+            try:
+                await self.active_llm.process_frame(frame, direction)
+            except Exception as e:
+                await self.trigger_llm_fallback(e)
+                if self.fallback_active:
+                    await self.active_llm.queue_frame(frame, direction)
+
+        async def trigger_llm_fallback(self, error):
+            if not self.fallback_active:
+                logger.error(f"Primary LLM failed: {error}. Switching to fallback LLM.")
+                self.fallback_active = True
+                try:
+                    self.active_llm = self.fallback_factory()
+                    self.active_llm.link(self._next)
+                    
+                    # Initialize fallback LLM variables and boot its tasks
+                    from pipecat.processors.frame_processor import FrameProcessorSetup
+                    setup = FrameProcessorSetup(
+                        clock=self._clock,
+                        task_manager=self._task_manager,
+                        pipeline_worker=self._pipeline_worker,
+                        observer=self._observer,
+                    )
+                    await self.active_llm.setup(setup)
+                    self.active_llm._FrameProcessor__started = True
+                    
+                    # Replay StartFrame to start fallback LLM
+                    if hasattr(self, "_start_frame"):
+                        await self.active_llm.queue_frame(self._start_frame, FrameDirection.DOWNSTREAM)
+                    
+                    from pipecat.frames.frames import TTSSpeakFrame, BotStoppedSpeakingFrame
+                    await self.push_frame(TTSSpeakFrame(text="Connecting to backup engine. Please wait."))
+                    await self.push_frame(BotStoppedSpeakingFrame())
+                except Exception as fallback_err:
+                    logger.error(f"Fallback LLM also failed: {fallback_err}")
+
+except ImportError:
+    FrameProcessor = object
+    StartFrame = object
+    ResilientSTTProcessor = object
+    ResilientLLMProcessor = object
+
+
 class MockPipecatProcessor:
     """Lightweight stand-in used exclusively in unit tests."""
 
@@ -87,12 +234,67 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
             language=metadata.get("language", "hi"),
             sample_rate=sample_rate
         )
-        logger.info("DeepgramSTTService created (via Pillar 2) | model={m}", m=metadata.get("model", "nova-2"))
-        return stt
+
+        def fallback_stt_factory():
+            from pipecat.services.groq.stt import GroqSTTService
+            from app.config import GROQ_API_KEY, GROQ_WHISPER_MODEL
+            if not GROQ_API_KEY:
+                from pipecat.services.openai.stt import OpenAISTTService
+                from app.config import OPENAI_API_KEY
+                logger.info("Groq API key missing. Using OpenAI Whisper STT as fallback.")
+                return OpenAISTTService(api_key=OPENAI_API_KEY)
+            
+            logger.info("Created Groq STT (Whisper) service as fallback | model={m}", m=GROQ_WHISPER_MODEL)
+            return GroqSTTService(
+                api_key=GROQ_API_KEY,
+                model=GROQ_WHISPER_MODEL
+            )
+
+        logger.info("DeepgramSTTService created (resilient proxy) | model={m}", m=metadata.get("model", "nova-2"))
+        processor = ResilientSTTProcessor(stt, fallback_stt_factory)
+
+        # Patch stt's client connect to trigger STT fallback on auth / connection errors
+        from contextlib import asynccontextmanager
+        original_connect = stt._client.listen.v1.connect
+
+        @asynccontextmanager
+        async def custom_connect(*args, **kwargs):
+            try:
+                async with original_connect(*args, **kwargs) as connection:
+                    yield connection
+            except Exception as e:
+                logger.error(f"Deepgram connect failed asynchronously: {e}. Switching to Whisper fallback STT.")
+                await processor.trigger_stt_fallback(e)
+                raise e
+
+        stt._client.listen.v1.connect = custom_connect
+        return processor
 
     elif role == ProcessorRole.LLM:
         from app.config import LLM_PROVIDER
         
+        def fallback_llm_factory():
+            if LLM_PROVIDER.lower() == "openai":
+                from pipecat.services.groq.llm import GroqLLMService
+                from app.config import GROQ_API_KEY, GROQ_MODEL
+                if not GROQ_API_KEY:
+                    raise ValueError("GROQ_API_KEY is not set for fallback LLM.")
+                logger.info("Created GroqLLMService as fallback.")
+                return GroqLLMService(
+                    api_key=GROQ_API_KEY,
+                    settings=GroqLLMService.Settings(model=GROQ_MODEL),
+                )
+            else:
+                from pipecat.services.openai.llm import OpenAILLMService
+                from app.config import OPENAI_API_KEY, OPENAI_MODEL
+                if not OPENAI_API_KEY:
+                    raise ValueError("OPENAI_API_KEY is not set for fallback LLM.")
+                logger.info("Created OpenAILLMService as fallback.")
+                return OpenAILLMService(
+                    api_key=OPENAI_API_KEY,
+                    model=OPENAI_MODEL,
+                )
+
         if LLM_PROVIDER.lower() == "openai":
             from pipecat.services.openai.llm import OpenAILLMService
             from app.config import OPENAI_API_KEY, OPENAI_MODEL
@@ -105,8 +307,8 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
                 api_key=OPENAI_API_KEY,
                 model=model,
             )
-            logger.info("OpenAILLMService created | model={m}", m=model)
-            return llm
+            logger.info("OpenAILLMService created (resilient proxy) | model={m}", m=model)
+            return ResilientLLMProcessor(llm, fallback_llm_factory)
         else:
             from pipecat.services.groq.llm import GroqLLMService
     
@@ -118,8 +320,8 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
                 api_key=GROQ_API_KEY,
                 settings=GroqLLMService.Settings(model=model),
             )
-            logger.info("GroqLLMService created | model={m}", m=model)
-            return llm
+            logger.info("GroqLLMService created (resilient proxy) | model={m}", m=model)
+            return ResilientLLMProcessor(llm, fallback_llm_factory)
 
     elif role == ProcessorRole.TTS:
         from app.config import TTS_PROVIDER, TRANSPORT_MODE

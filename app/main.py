@@ -214,14 +214,27 @@ async def websocket_endpoint(websocket: WebSocket):
             logger.error(f"Failed to fetch summary in websocket: {e}")
     
     # Block and run the voice session on this websocket
-    await run_voice_session(
-        transport=transport, 
-        phone_number=phone_number, 
-        company_context=company_context,
-        client_id_str=client_id_str,
-        previous_summary=previous_summary,
-        connection_metrics=connection_metrics
-    )
+    try:
+        await run_voice_session(
+            transport=transport, 
+            phone_number=phone_number, 
+            company_context=company_context,
+            client_id_str=client_id_str,
+            previous_summary=previous_summary,
+            connection_metrics=connection_metrics
+        )
+    except WebSocketDisconnect as e:
+        logger.warning(f"Twilio WebSocket disconnected in endpoint: code={e.code}, reason={e.reason}")
+    except Exception as exc:
+        logger.exception(f"Unhandled exception in websocket endpoint: {exc}")
+    finally:
+        try:
+            from fastapi.websockets import WebSocketState
+            if websocket.client_state != WebSocketState.DISCONNECTED:
+                logger.info("Closing Twilio WebSocket connection gracefully")
+                await websocket.close()
+        except Exception as close_err:
+            logger.warning(f"Error while closing Twilio WebSocket: {close_err}")
 
 
 # ── Core Pipeline Session ───────────────────────────────────────────────
@@ -349,7 +362,8 @@ async def run_voice_session(
                 await SessionRepository.close_session(db_session, event.session_id, int(sess_data.duration_seconds))
                 logger.info("Persisted call summary and closed DB session for {sid}", sid=event.session_id)
 
-    await event_bus.subscribe("SessionClosed", on_session_closed)
+    sub_ids = []
+    sub_ids.append(await event_bus.subscribe("SessionClosed", on_session_closed))
                 
     await event_bus.start()
     event_bus.publish_sync(SessionCreated(session_id=session_id))
@@ -373,12 +387,36 @@ async def run_voice_session(
         if e.session_id != session_id:
             return
         text = e.payload.get("text", "")
+        emotion = "Neutral"  # no emoji — Windows logger can't handle emoji
+        detected_lang = "unknown"
         if text:
+            # Strip any [System: ...] prompt engineering suffixes just in case
+            import re
+            text = re.sub(r'\s*\[System:.*?\]', '', text, flags=re.DOTALL).strip()
+            logger.info(f"on_transcript_ready: cleaned_text='{text}'")
+            
+            # Detect language from the raw text (before stripping)
+            devanagari_count = len(re.findall(r'[\u0900-\u097F]', text))
+            hinglish_indicators = {'hai','mujhe','kya','kaise','chahiye','mera','ko','se','mein','kar','hu','tha','sakte','batao','koi','nahi','haan','rha'}
+            words = set(re.findall(r'\b\w+\b', text.lower()))
+            if devanagari_count > 10:
+                detected_lang = "Hindi"
+            elif len(words.intersection(hinglish_indicators)) >= 1:
+                detected_lang = "Hinglish"
+            else:
+                detected_lang = "English"
+
+            # Analyze user emotion
+            from app.services.emotion_analyzer import analyze_emotion
+            emotion = analyze_emotion(text)
+            logger.info(f"on_transcript_ready: lang={detected_lang} | emotion={emotion}")
+            
             await session_manager.add_message(session_id, role="user", content=text)
         await broadcast_frontend_event("transcription_received", {
             "text": text,
-            "language": e.payload.get("language", "unknown"),
-            "latency_ms": e.payload.get("latency_ms", 0)
+            "language": detected_lang,
+            "latency_ms": e.payload.get("latency_ms", 0),
+            "emotion": emotion
         })
         
     async def on_thinking_started(e: ThinkingStarted):
@@ -393,11 +431,24 @@ async def run_voice_session(
             return
         text = e.payload.get("text", "")
         if text:
-            await session_manager.add_message(session_id, role="assistant", content=text)
-        await broadcast_frontend_event("llm_response_complete", {
-            "response_text": text,
-            "latency_ms": e.payload.get("latency_ms", 0)
-        })
+            # Clean up function tags and JSON parameters from history text
+            import re
+            cleaned_text = re.sub(r'(?:\(|<)?\s*function=save_lead.*?(?:\s*<\/function>|\s*\)|>)?', '', text, flags=re.DOTALL).strip()
+            cleaned_text = cleaned_text.replace("</function>", "").strip()
+            
+            await session_manager.add_message(session_id, role="assistant", content=cleaned_text)
+            
+            await broadcast_frontend_event("llm_response_complete", {
+                "response_text": cleaned_text,
+                "full_text": cleaned_text,
+                "latency_ms": e.payload.get("latency_ms", 0)
+            })
+        else:
+            await broadcast_frontend_event("llm_response_complete", {
+                "response_text": "",
+                "full_text": "",
+                "latency_ms": e.payload.get("latency_ms", 0)
+            })
 
     async def on_speaking_started(e: SpeakingStarted):
         await broadcast_frontend_event("tts_playing", {
@@ -416,14 +467,14 @@ async def run_voice_session(
             "component": e.payload.get("component", "unknown")
         })
 
-    await event_bus.subscribe("AssistantGreetingStarted", on_greeting_started)
-    await event_bus.subscribe("AssistantGreetingCompleted", on_greeting_completed)
-    await event_bus.subscribe("TranscriptReady", on_transcript_ready)
-    await event_bus.subscribe("ThinkingStarted", on_thinking_started)
-    await event_bus.subscribe("ResponseGenerated", on_response_generated)
-    await event_bus.subscribe("SpeakingStarted", on_speaking_started)
-    await event_bus.subscribe("SpeakingFinished", on_speaking_finished)
-    await event_bus.subscribe("ErrorOccurred", on_error)
+    sub_ids.append(await event_bus.subscribe("AssistantGreetingStarted", on_greeting_started))
+    sub_ids.append(await event_bus.subscribe("AssistantGreetingCompleted", on_greeting_completed))
+    sub_ids.append(await event_bus.subscribe("TranscriptReady", on_transcript_ready))
+    sub_ids.append(await event_bus.subscribe("ThinkingStarted", on_thinking_started))
+    sub_ids.append(await event_bus.subscribe("ResponseGenerated", on_response_generated))
+    sub_ids.append(await event_bus.subscribe("SpeakingStarted", on_speaking_started))
+    sub_ids.append(await event_bus.subscribe("SpeakingFinished", on_speaking_finished))
+    sub_ids.append(await event_bus.subscribe("ErrorOccurred", on_error))
 
     # ── 3. Conversation FSM ─────────────────────────────────────────────
     fsm = ConversationStateMachine(session_id=session_id)
@@ -471,6 +522,15 @@ async def run_voice_session(
     )
     logger.info("PipecatAdapter ready | execution_id={eid}", eid=execution_id)
 
+    if TRANSPORT_MODE.lower() == "livekit":
+        raw_transport = transport.get_pipecat_transport()
+        @raw_transport.event_handler("on_participant_disconnected")
+        async def on_participant_disconnected(transport_instance, participant_id):
+            logger.info("Participant {pid} disconnected. Queueing EndFrame to close pipeline.", pid=participant_id)
+            from pipecat.frames.frames import EndFrame
+            if adapter.task:
+                await adapter.task.queue_frame(EndFrame())
+
     # ── 8. Update session state ─────────────────────────────────────────
     await session_manager.set_state(session_id, SessionState.LISTENING)
 
@@ -480,8 +540,8 @@ async def run_voice_session(
         # P0 Fix: Enforce wait_for to prevent infinite hangs if supported, or just catch disconnects
         await adapter.run()
 
-    except WebSocketDisconnect:
-        logger.warning("Twilio WebSocket disconnected abruptly.")
+    except WebSocketDisconnect as e:
+        logger.warning(f"Twilio WebSocket disconnected abruptly: code={e.code}, reason={e.reason}")
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt — shutting down gracefully")
     except Exception as exc:
@@ -502,8 +562,18 @@ async def run_voice_session(
         await event_bus._queue.join()  # Wait for SessionClosed to be processed (persists summary) before stopping
 
 
+        # Unsubscribe event listeners for this session
+        for sub_id in sub_ids:
+            try:
+                await event_bus.unsubscribe(sub_id)
+            except Exception as e:
+                logger.warning("Failed to unsubscribe handler {sub_id}: {e}", sub_id=sub_id, e=e)
+
         await event_bus.stop()
-        logger.info("Session closed | session_id={sid}", sid=session_id)
+
+        # Delete session from temporary SessionManager RAM store (Neon DB records remain saved)
+        await session_manager.delete_session(session_id)
+        logger.info("Session closed and temporary RAM cleaned | session_id={sid}", sid=session_id)
         
         # Dump latency profiles
         if connection_metrics:
