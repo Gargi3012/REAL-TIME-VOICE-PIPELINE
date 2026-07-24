@@ -388,6 +388,9 @@ async def run_voice_session(
             return
         text = e.payload.get("text", "")
         if text:
+            # Strip any [System: ...] prompt engineering suffixes just in case
+            import re
+            text = re.sub(r'\s*\[System:.*?\]', '', text, flags=re.DOTALL).strip()
             await session_manager.add_message(session_id, role="user", content=text)
         await broadcast_frontend_event("transcription_received", {
             "text": text,
@@ -410,6 +413,7 @@ async def run_voice_session(
             await session_manager.add_message(session_id, role="assistant", content=text)
         await broadcast_frontend_event("llm_response_complete", {
             "response_text": text,
+            "full_text": text,
             "latency_ms": e.payload.get("latency_ms", 0)
         })
 

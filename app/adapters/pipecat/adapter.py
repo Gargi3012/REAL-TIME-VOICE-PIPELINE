@@ -200,6 +200,7 @@ def _build_real_pipeline_task(
             super().__init__()
             self.context = context
             self._current_llm_response = ""
+            self._processed_transcription_ids = set()
 
         async def on_push_frame(self, data: FramePushed):
             frame = data.frame
@@ -222,9 +223,15 @@ def _build_real_pipeline_task(
                     latency_tracker.on_vad_stop()
                 
             elif isinstance(frame, TranscriptionFrame) and frame.text:
-                if latency_tracker:
-                    latency_tracker.on_stt_transcript()
-                bridge.on_transcript_ready(frame.text)
+                frame_id = id(frame)
+                if frame_id not in self._processed_transcription_ids:
+                    self._processed_transcription_ids.add(frame_id)
+                    if latency_tracker:
+                        latency_tracker.on_stt_transcript()
+                    # Strip [System: ...] prompt engineering blocks to keep the UI and database history clean
+                    import re
+                    clean_text = re.sub(r'\s*\[System:.*?\]', '', frame.text, flags=re.DOTALL).strip()
+                    bridge.on_transcript_ready(clean_text)
                 
             elif isinstance(frame, LLMFullResponseStartFrame):
                 if latency_tracker:
