@@ -83,10 +83,10 @@ def _build_real_pipeline_task(
         processors.append(real_transport.input())
         
         # In Pipecat 1.5.0, VAD is a separate processor that must be injected manually
+        # We use the fine-tuned VAD analyzer from Pillar 2.
         from pipecat.processors.audio.vad_processor import VADProcessor
-        from pipecat.audio.vad.vad_analyzer import VADParams
-        from pipecat.audio.vad.silero import SileroVADAnalyzer
-        processors.append(VADProcessor(vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2))))
+        from app.adapters.pipecat.transport import _build_vad_analyzer
+        processors.append(VADProcessor(vad_analyzer=_build_vad_analyzer()))
 
     # 2. Core processors (STT → LLM → TTS) from the mapper
     # We must wire up the OpenAILLMContext and aggregator for the LLM
@@ -95,7 +95,7 @@ def _build_real_pipeline_task(
     from pipecat.pipeline.pipeline import Pipeline as PipecatPipeline
     
     # We need to find the LLM to attach the aggregator
-    llm = next((p for p in pipecat_processors if isinstance(p, (GroqLLMService, OpenAILLMService))), None)
+    llm = next((p for p in pipecat_processors if isinstance(p, (GroqLLMService, OpenAILLMService)) or p.__class__.__name__ == "ResilientLLMProcessor"), None)
     
     if llm:
         from pipecat.processors.aggregators.llm_context import LLMContext
@@ -171,7 +171,7 @@ def _build_real_pipeline_task(
         filler_processor = LatencyFillerProcessor(filler_wav_paths=filler_wavs, delay_threshold_ms=400)
         
         for p in pipecat_processors:
-            if isinstance(p, (GroqLLMService, OpenAILLMService)):
+            if isinstance(p, (GroqLLMService, OpenAILLMService)) or p.__class__.__name__ == "ResilientLLMProcessor":
                 new_processors.append(LanguageRoutingProcessor(shared_state=shared_state))
                 new_processors.append(user_agg)
                 new_processors.append(filler_processor)
