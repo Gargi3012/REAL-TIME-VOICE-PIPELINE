@@ -147,7 +147,7 @@ def _build_real_pipeline_task(
             
         agg_params = LLMUserAggregatorParams(
             user_turn_strategies=UserTurnStrategies(
-                stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.35)]
+                stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.8)]
             ),
             user_mute_strategies=mute_strategies
         )
@@ -383,14 +383,19 @@ class PipecatAdapter:
                 await asyncio.sleep(0.5)
                 
                 if getattr(self, "previous_summary", ""):
-                    from pipecat.frames.frames import LLMMessagesAppendFrame
+                    from pipecat.frames.frames import LLMRunFrame
                     logger.bind(session_id=self.session_id).info("Queueing dynamic returning customer greeting prompt")
                     messages = [{
                         "role": "user", 
                         "content": "The user has just connected to the call. Please greet the returning customer naturally, referencing the previous conversation summary to personalize the greeting. Ask how you can assist them today. Do not use a fixed template, just be welcoming and concise."
                     }]
+                    # In Pipecat 1.5.0, BaseOpenAILLMService ignores LLMMessagesAppendFrame.
+                    # We must modify the shared context directly and push LLMRunFrame downstream.
+                    if hasattr(self.task, "_llm_context"):
+                        for m in messages:
+                            self.task._llm_context.add_message(m)
                     frames_to_queue = [
-                        LLMMessagesAppendFrame(messages=messages, run_llm=True)
+                        LLMRunFrame()
                     ]
                 else:
                     greeting_text = "Hello, I'm Sarah from Cybernauts Noida. How can I assist you?"
@@ -417,9 +422,24 @@ class PipecatAdapter:
                 runner = PipelineRunner()
                 await runner.run(self.task)
 
+        except asyncio.CancelledError:
+            logger.bind(session_id=self.session_id).warning(
+                "Pipecat adapter execution cancelled."
+            )
+            try:
+                if hasattr(self.task, "cancel"):
+                    self.task.cancel()
+            except Exception:
+                pass
+            raise
         except Exception as e:
             self.bridge.on_pipeline_failed(e)
             logger.bind(session_id=self.session_id).error(
                 "Pipecat adapter execution failed: {e}", e=e
             )
+            try:
+                if hasattr(self.task, "cancel"):
+                    self.task.cancel()
+            except Exception:
+                pass
             raise PipecatAdapterError(f"Execution failed: {e}") from e

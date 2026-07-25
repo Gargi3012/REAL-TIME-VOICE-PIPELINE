@@ -80,13 +80,13 @@ class LatencyFillerProcessor(FrameProcessor):
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
         
-        from pipecat.frames.frames import LLMMessagesAppendFrame
+        from pipecat.frames.frames import LLMContextFrame
         
         # Intercept going DOWNSTREAM from user_agg to LLM
-        if isinstance(frame, LLMMessagesAppendFrame):
+        if isinstance(frame, LLMContextFrame):
             # Only trigger filler if it's a user message, not system message
-            # LLMMessagesAppendFrame has 'messages' list
-            is_user_msg = any(m.get("role") == "user" for m in frame.messages)
+            messages = frame.context.messages if hasattr(frame.context, "messages") else frame.context.get_messages()
+            is_user_msg = any(m.get("role") == "user" for m in messages)
             if is_user_msg:
                 if self._wait_task and not self._wait_task.done():
                     self._wait_task.cancel()
