@@ -57,6 +57,10 @@ try:
             await self.active_stt.cleanup()
 
         async def process_frame(self, frame, direction):
+            # Ensure the active STT is correctly wired for upstream frames
+            if self.active_stt._prev != self._prev:
+                self.active_stt._prev = self._prev
+
             # Capture StartFrame so we can replay it for fallback initialization
             if isinstance(frame, StartFrame):
                 self._start_frame = frame
@@ -79,6 +83,7 @@ try:
                 try:
                     self.active_stt = self.fallback_factory()
                     self.active_stt.link(self._next)
+                    self.active_stt._prev = self._prev
                     
                     # Initialize fallback STT variables and boot its tasks
                     from pipecat.processors.frame_processor import FrameProcessorSetup
@@ -125,6 +130,10 @@ try:
             await self.active_llm.cleanup()
 
         async def process_frame(self, frame, direction):
+            # Ensure the active LLM is correctly wired for upstream frames
+            if self.active_llm._prev != self._prev:
+                self.active_llm._prev = self._prev
+
             # Capture StartFrame so we can replay it for fallback initialization
             if isinstance(frame, StartFrame):
                 self._start_frame = frame
@@ -147,6 +156,7 @@ try:
                 try:
                     self.active_llm = self.fallback_factory()
                     self.active_llm.link(self._next)
+                    self.active_llm._prev = self._prev
                     
                     # Initialize fallback LLM variables and boot its tasks
                     from pipecat.processors.frame_processor import FrameProcessorSetup
@@ -286,6 +296,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
                 )
             else:
                 from pipecat.services.openai.llm import OpenAILLMService
+                from pipecat.services.openai.base_llm import BaseOpenAILLMService
                 from app.config import OPENAI_API_KEY, OPENAI_MODEL
                 if not OPENAI_API_KEY:
                     raise ValueError("OPENAI_API_KEY is not set for fallback LLM.")
@@ -301,6 +312,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
 
         if LLM_PROVIDER.lower() == "openai":
             from pipecat.services.openai.llm import OpenAILLMService
+            from pipecat.services.openai.base_llm import BaseOpenAILLMService
             from app.config import OPENAI_API_KEY, OPENAI_MODEL
             
             if not OPENAI_API_KEY:
