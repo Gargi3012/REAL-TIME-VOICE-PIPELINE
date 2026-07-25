@@ -422,9 +422,24 @@ class PipecatAdapter:
                 runner = PipelineRunner()
                 await runner.run(self.task)
 
+        except asyncio.CancelledError:
+            logger.bind(session_id=self.session_id).warning(
+                "Pipecat adapter execution cancelled."
+            )
+            try:
+                if hasattr(self.task, "cancel"):
+                    self.task.cancel()
+            except Exception:
+                pass
+            raise
         except Exception as e:
             self.bridge.on_pipeline_failed(e)
             logger.bind(session_id=self.session_id).error(
                 "Pipecat adapter execution failed: {e}", e=e
             )
+            try:
+                if hasattr(self.task, "cancel"):
+                    self.task.cancel()
+            except Exception:
+                pass
             raise PipecatAdapterError(f"Execution failed: {e}") from e

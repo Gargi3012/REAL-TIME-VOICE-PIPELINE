@@ -46,6 +46,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import livekit_router
 from contextlib import asynccontextmanager
 
+APP_STATE = {"is_ready": False}
+ACTIVE_STREAMS = set()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize DB on startup to wake up Neon and pre-warm connection pool
@@ -53,21 +56,40 @@ async def lifespan(app: FastAPI):
     from app.db.connection import db_manager
     try:
         db_manager.init_db()
-        async with db_manager.get_session() as db:
-            from sqlalchemy import text
-            await db.execute(text("SELECT 1"))
+        # Retry mechanism for transient DB startup failures
+        import asyncio
+        for attempt in range(3):
+            try:
+                async with db_manager.get_session() as db:
+                    from sqlalchemy import text
+                    await db.execute(text("SELECT 1"))
+                break
+            except Exception as retry_err:
+                if attempt == 2:
+                    raise retry_err
+                await asyncio.sleep(1.0)
         logger.info("Database connection pool initialized successfully.")
     except Exception as e:
-        logger.error(f"Failed to initialize database on startup: {e}")
+        logger.error(f"Failed to initialize database on startup (will degrade gracefully): {e}")
         # We do not crash the app so that we don't break the pipeline if DB is temporarily down.
-        # It will retry on the first call.
+
+    # Mark as ready regardless of DB to allow graceful degradation
+    APP_STATE["is_ready"] = True
     
     yield
     
     logger.info("Shutting down database connection pool...")
+    APP_STATE["is_ready"] = False
     await db_manager.close()
 
 app = FastAPI(lifespan=lifespan)
+
+@app.get("/health")
+def health_check():
+    """Backend readiness verification before accepting requests."""
+    if APP_STATE.get("is_ready"):
+        return {"status": "ok"}
+    raise HTTPException(status_code=503, detail="Service not ready")
 
 env_origins = os.getenv("ALLOWED_ORIGINS", "")
 allowed_origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
@@ -100,6 +122,11 @@ async def handle_inbound_call(request: Request):
     webhook_processing_start = time.perf_counter()
     logger.info("Incoming Twilio call received")
     
+    # ── Backend Readiness ──
+    if not APP_STATE.get("is_ready"):
+        logger.warning("Incoming Twilio call rejected: Backend not ready.")
+        raise HTTPException(status_code=503, detail="Service not ready")
+        
     form_data = await request.form()
     
     # ── Security: Twilio Signature Validation ───────────────────────────
@@ -142,10 +169,18 @@ async def handle_inbound_call(request: Request):
 
     try:
         async def fetch_db():
-            async with db_manager.get_session() as db:
-                client = await ClientRepository.get_or_create_client(db, phone_number)
-                summary_text = await SessionRepository.get_summary(db, client.id)
-                return str(client.id), summary_text
+            # Robust retry mechanism for transient failures
+            import asyncio
+            for attempt in range(2):
+                try:
+                    async with db_manager.get_session() as db:
+                        client = await ClientRepository.get_or_create_client(db, phone_number)
+                        summary_text = await SessionRepository.get_summary(db, client.id)
+                        return str(client.id), summary_text
+                except Exception as db_err:
+                    if attempt == 1:
+                        raise db_err
+                    await asyncio.sleep(0.5)
                 
         # Wait up to 3 seconds for the DB, so we don't block Twilio's 15s webhook timeout
         client_id_str, summary_text = await asyncio.wait_for(fetch_db(), timeout=3.0)
@@ -184,21 +219,32 @@ async def handle_inbound_call(request: Request):
 async def websocket_endpoint(websocket: WebSocket):
     """Twilio WebSocket endpoint for Pipecat audio stream."""
     media_stream_connection = time.perf_counter()
-    await websocket.accept()
-    logger.info("WebSocket connection accepted from Twilio")
+    try:
+        await websocket.accept()
+        logger.info("WebSocket connection accepted from Twilio")
+    except Exception as accept_err:
+        logger.error(f"Failed to accept WebSocket connection: {accept_err}")
+        return
     
     # Twilio sends a 'connected' event, then a 'start' event
     import json
     stream_sid = None
     
-    # Wait for the start event
-    for _ in range(5): # Don't loop forever
-        data = await websocket.receive_text()
-        msg = json.loads(data)
-        if msg.get("event") == "start":
-            stream_sid = msg["start"]["streamSid"]
-            
-            # Extract custom parameters from the start event
+    try:
+        # Wait for the start event
+        for _ in range(5): # Don't loop forever
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+            if msg.get("event") == "start":
+                stream_sid = msg["start"]["streamSid"]
+                
+                # Prevention of duplicate session creation
+                if stream_sid in ACTIVE_STREAMS:
+                    logger.warning(f"Duplicate WebSocket connection for stream {stream_sid}. Rejecting.")
+                    return
+                ACTIVE_STREAMS.add(stream_sid)
+                
+                # Extract custom parameters from the start event
             custom_params = msg["start"].get("customParameters", {})
             phone_number = custom_params.get("phone", "unknown_client")
             client_id_str = custom_params.get("client_id", "")
@@ -269,6 +315,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.close()
         except Exception as close_err:
             logger.warning(f"Error while closing Twilio WebSocket: {close_err}")
+            
+        # Cleanup of abandoned streams
+        if stream_sid and stream_sid in ACTIVE_STREAMS:
+            ACTIVE_STREAMS.remove(stream_sid)
 
 
 # ── Core Pipeline Session ───────────────────────────────────────────────
@@ -594,6 +644,8 @@ async def run_voice_session(
 
     except WebSocketDisconnect as e:
         logger.warning(f"Twilio WebSocket disconnected abruptly: code={e.code}, reason={e.reason}")
+    except asyncio.CancelledError:
+        logger.warning("Pipeline task was cancelled by system")
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt — shutting down gracefully")
     except Exception as exc:
@@ -601,8 +653,16 @@ async def run_voice_session(
     finally:
         # P0 Fix: Zombie Pipeline Cleanup
         # If the adapter is still running, ensure it's stopped.
-        # Pipecat pipeline task cancellation logic here if needed.
         logger.info("Executing pipeline cleanup.")
+        
+        # Ensure the pipecat task is canceled to prevent hanging background workers
+        if adapter and getattr(adapter, 'task', None):
+            try:
+                if hasattr(adapter.task, 'cancel'):
+                    adapter.task.cancel()
+                    logger.info("Pipecat adapter task cancelled.")
+            except Exception as cancel_err:
+                logger.warning(f"Error canceling Pipecat adapter task: {cancel_err}")
 
         try:
             fsm.close(reason="pipeline finished")
