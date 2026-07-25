@@ -329,6 +329,7 @@ async def run_voice_session(
                     "details useful for future calls (who they are, what they asked about, any "
                     "preferences or unresolved issues). Do not include greetings or small talk. "
                     "If there is no meaningful conversation, do NOT speculate about technical glitches or silent calls, just state that no new information was gathered.\n\n"
+                    "Additionally, analyze the overall call emotion of the caller based on their speech and tone in the transcript, and append it at the very end of your response in the format: '[Overall Call Emotion: Happy/Frustrated/Confused/Neutral]'. Let the overall emotion be chosen from Happy, Frustrated, Confused, or Neutral.\n\n"
                     f"Previous summary:\n{prev_summary_text if prev_summary_text else '(none, first call)'}\n\n"
                     f"New call transcript:\n{transcript if transcript else '(no conversation recorded)'}"
                 )
@@ -351,6 +352,23 @@ async def run_voice_session(
                     generated_summary = generated_summary.strip()
                     if not generated_summary:
                         generated_summary = prev_summary_text  # fallback: keep old summary
+                    
+                    # Extract overall emotion using regex
+                    overall_emotion = "Neutral"
+                    import re
+                    match = re.search(r'\[Overall Call Emotion:\s*(.*?)\]', generated_summary, re.IGNORECASE)
+                    if match:
+                        overall_emotion = match.group(1).strip()
+                        # Clean the tag from the summary text to keep the database summary clean
+                        generated_summary = re.sub(r'\s*\[Overall Call Emotion:.*?\]', '', generated_summary, flags=re.IGNORECASE).strip()
+                    
+                    logger.info(f"Session closed: Extracted overall_emotion='{overall_emotion}' | summary='{generated_summary[:50]}...'")
+                    
+                    # Broadcast to frontend so they can see the post-call analytics live
+                    await broadcast_frontend_event("session_analytics", {
+                        "summary": generated_summary,
+                        "overall_emotion": overall_emotion
+                    })
                 except Exception as summary_err:
                     logger.error(
                         "Summary generation failed for session {sid}: {err}",
