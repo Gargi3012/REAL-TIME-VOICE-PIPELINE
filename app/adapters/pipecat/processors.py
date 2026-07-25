@@ -290,9 +290,13 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
                 if not OPENAI_API_KEY:
                     raise ValueError("OPENAI_API_KEY is not set for fallback LLM.")
                 logger.info("Created OpenAILLMService as fallback.")
+                model_name = OPENAI_MODEL
+                extra_params = {}
+                if any(x in model_name.lower() for x in ["gpt-5", "luna", "sol", "terra"]):
+                    extra_params["reasoning_effort"] = "none"
                 return OpenAILLMService(
                     api_key=OPENAI_API_KEY,
-                    model=OPENAI_MODEL,
+                    settings=OpenAILLMService.Settings(model=model_name, extra=extra_params),
                 )
 
         if LLM_PROVIDER.lower() == "openai":
@@ -303,11 +307,14 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
                 raise ValueError("OPENAI_API_KEY is not set in your .env file.")
                 
             model = metadata.get("model", OPENAI_MODEL)
+            extra_params = {}
+            if any(x in model.lower() for x in ["gpt-5", "luna", "sol", "terra"]):
+                extra_params["reasoning_effort"] = "none"
             llm = OpenAILLMService(
                 api_key=OPENAI_API_KEY,
-                model=model,
+                settings=OpenAILLMService.Settings(model=model, extra=extra_params),
             )
-            logger.info("OpenAILLMService created (resilient proxy) | model={m}", m=model)
+            logger.info("OpenAILLMService created (resilient proxy) | model={m} | extra={e}", m=model, e=extra_params)
             return ResilientLLMProcessor(llm, fallback_llm_factory)
         else:
             from pipecat.services.groq.llm import GroqLLMService

@@ -231,6 +231,11 @@ class VoicePipelineClient {
             case 'tts_complete':
                 this.ui.setStatus('Ready for input');
                 break;
+            case 'session_analytics':
+                this.ui.updateMetrics(undefined, undefined, data.overall_emotion);
+                this.ui.addMessage('System', `Overall Call Emotion: ${data.overall_emotion}. Summary: ${data.summary}`, {});
+                this.ui.setStatus('Call analyzed successfully');
+                break;
             case 'error':
                 this.ui.showToast(data.error_message || 'Pipeline Error', 'error');
                 this.ui.setStatus('Error occurred');
@@ -240,6 +245,7 @@ class VoicePipelineClient {
 
     async joinCall() {
         this.ui.setConnectionState('connecting');
+        this.ui.updateMetrics(0, '-', '-');
         try {
             // 1. Get Token from Backend
             const response = await fetch(`${this.API_BASE}/join`, { method: 'POST' });
