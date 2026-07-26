@@ -45,14 +45,14 @@ class LanguageRoutingProcessor(FrameProcessor):
             
             # Force language based on indicators
             if has_devanagari:
-                logger.info(f"Language Detection: Pure Hindi detected in '{frame.text}'")
-                frame.text = f"{frame.text}\n[You MUST reply completely in natural Hindi (Devanagari script)]"
+                logger.info(f"Language Detection: Devanagari detected in '{frame.text}'")
+                frame.text = f"{frame.text}\n[System: User is speaking Hindi. Respond in conversational Hinglish, UNLESS the user explicitly asked you to speak in English or another language.]"
             elif hindi_word_count >= 1:
                 logger.info(f"Language Detection: Hinglish detected in '{frame.text}'")
-                frame.text = f"{frame.text}\n[You MUST reply in conversational Hinglish (Roman script)]"
+                frame.text = f"{frame.text}\n[System: User is speaking Hinglish. Respond in conversational Hinglish, UNLESS the user explicitly asked you to speak in English or another language.]"
             else:
                 logger.info(f"Language Detection: English detected in '{frame.text}'")
-                frame.text = f"{frame.text}\n[You MUST reply completely in English]"
+                frame.text = f"{frame.text}\n[System: User is speaking English. Respond completely in English, UNLESS the user explicitly asked you to speak in Hindi/Hinglish.]"
             
         await self.push_frame(frame, direction)
 
