@@ -106,6 +106,12 @@ if not allowed_origins:
     logger.warning("No ALLOWED_ORIGINS set in environment. Restricting to strict localhost.")
     allowed_origins = ["http://localhost:8000"]
 
+
+@app.on_event("startup")
+async def load_faq_cache_on_startup():
+    from app.llm.company_faq import refresh_faq_cache
+    await refresh_faq_cache()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,

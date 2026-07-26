@@ -18,7 +18,7 @@ class ContextManager:
         """
         self.session_manager = session_manager
 
-    def get_trimmed_history(
+    async def get_trimmed_history(
         self,
         session_id: str,
         max_messages: int = 10,
@@ -41,7 +41,7 @@ class ContextManager:
         if max_messages < 1:
             raise ValueError("max_messages must be at least 1")
 
-        history = self.session_manager.get_history(session_id)
+        history = await self.session_manager.get_history(session_id)
         if history is None:
             logger.bind(session_id=session_id).warning(
                 "Cannot retrieve history — session not found"
