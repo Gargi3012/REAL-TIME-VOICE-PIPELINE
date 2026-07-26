@@ -48,6 +48,12 @@ from app.routers import livekit_router
 
 app = FastAPI()
 
+
+@app.on_event("startup")
+async def load_faq_cache_on_startup():
+    from app.llm.company_faq import refresh_faq_cache
+    await refresh_faq_cache()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

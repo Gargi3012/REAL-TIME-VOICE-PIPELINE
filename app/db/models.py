@@ -44,3 +44,12 @@ class ConversationSummary(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
     client: Mapped["Client"] = relationship("Client", back_populates="summary")
+class CompanyFAQ(Base):
+    __tablename__ = "company_faqs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    category: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)

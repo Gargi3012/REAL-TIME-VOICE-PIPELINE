@@ -48,13 +48,12 @@ async def main() -> None:
     context_manager = ContextManager(session_manager)
 
     # 2. Create a session
-    session = session_manager.create_session(metadata={"test": "true"})
+    session = await session_manager.create_session(metadata={"test": "true"})
     session_id = session.session_id
     print(f"Created session ID: {session_id}")
 
     # 3. Add system prompt
-    session_manager.add_message(session_id, role="system", content=VOICE_SYSTEM_PROMPT)
-
+    await session_manager.add_message(session_id, role="system", content=VOICE_SYSTEM_PROMPT)
     # 4. Add conversation history
     print("\nAdding conversation history...")
     turns = [
@@ -74,10 +73,9 @@ async def main() -> None:
     ]
 
     for role, content in turns:
-        session_manager.add_message(session_id, role=role, content=content)  # type: ignore
-
+        await session_manager.add_message(session_id, role=role, content=content)  # type: ignore
     # Print the full history to verify
-    full_history = session_manager.get_history(session_id)
+    full_history = await session_manager.get_history(session_id)
     if full_history:
         print("\n--- Full History ---")
         for i, msg in enumerate(full_history):
@@ -85,7 +83,7 @@ async def main() -> None:
 
     # 5. Trim to last 5 messages (retains system prompt at index 0)
     print("\nTrimming history to max_messages=5 (sliding window)...")
-    trimmed_history = context_manager.get_trimmed_history(session_id, max_messages=5)
+    trimmed_history = await context_manager.get_trimmed_history(session_id, max_messages=5)
 
     print("\n--- Trimmed History (Expected 5 messages, starting with SYSTEM) ---")
     for i, msg in enumerate(trimmed_history):
