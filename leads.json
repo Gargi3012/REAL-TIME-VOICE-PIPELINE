@@ -73,5 +73,23 @@
         "timestamp": "2026-07-21T16:02:32.339458",
         "name": "Rahul",
         "phone": "70829680702"
+    },
+    {
+        "timestamp": "2026-07-26T12:48:55.950402",
+        "name": "Rahul",
+        "phone": "0708 2968 0702",
+        "project_details": "Career recommendation website for children, including student and admin dashboards, assessments, recommendations, learning roadmap, and progress tracking. Estimated budget \u20b92.5\u20133 lakh; timeline approximately 2.5 months."
+    },
+    {
+        "timestamp": "2026-07-27T00:44:02.680892",
+        "name": "\u0930\u093e\u0939\u0941\u0932",
+        "phone": "070829680702",
+        "project_details": "Basic website \u092c\u0928\u0935\u093e\u0928\u0940 \u0939\u0948\u0964"
+    },
+    {
+        "timestamp": "2026-07-27T00:52:22.135450",
+        "name": "Rahul",
+        "phone": "1234567890",
+        "project_details": "Interested in developing a basic app; estimated budget discussed was approximately \u20b975,000, depending on features and platform."
     }
 ]

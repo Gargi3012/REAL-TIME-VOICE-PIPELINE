@@ -19,6 +19,19 @@ async def save_lead(params, name: str, phone: str, project_details: str = ""):
         phone (str): The phone number of the user/caller.
         project_details (str): Summary of what the user wants to build or their project requirements.
     """
+    import re
+    # Extract only digits from the provided phone string
+    digits = re.sub(r'\D', '', phone)
+    
+    if len(digits) != 10:
+        logger.warning(f"ACTIONABLE AI: 'save_lead' failed validation! Phone '{phone}' has {len(digits)} digits (expected 10).")
+        if getattr(params, "result_callback", None):
+            await params.result_callback({
+                "status": "error", 
+                "message": f"Validation Failed: The provided phone number '{phone}' is not a 10-digit number. You MUST tell the user that the number is not 10 digits and explicitly ask them to re-speak their 10-digit phone number."
+            })
+        return
+
     # Hash or mask PII in logs
     masked_phone = f"{phone[:3]}******{phone[-4:]}" if len(phone) > 7 else "***"
     logger.info(f"ACTIONABLE AI: Triggered 'save_lead' tool! Name: {name[:2]}***, Phone: {masked_phone}, Project: {project_details}")

@@ -278,15 +278,24 @@ async def websocket_endpoint(websocket: WebSocket):
     
     # ── Database Pre-fetch (Moved from handle_inbound_call) ──
     previous_summary = ""
-    if client_id_str:
+    if client_id_str or phone_number != "unknown_client":
         try:
             from app.db.connection import db_manager
             from app.repositories.session_repository import SessionRepository
+            from app.repositories.client_repository import ClientRepository
             import uuid
             
             async def fetch_db_ws():
+                nonlocal client_id_str
                 async with db_manager.get_session() as db:
-                    client_uuid = uuid.UUID(client_id_str)
+                    if client_id_str:
+                        client_uuid = uuid.UUID(client_id_str)
+                    else:
+                        client = await ClientRepository.get_or_create_client(db, phone_number)
+                        client_uuid = client.id
+                        # Update the outer client_id_str so it gets passed to run_voice_session
+                        client_id_str = str(client_uuid)
+                        
                     return await SessionRepository.get_summary(db, client_uuid)
                     
             summary_text = await asyncio.wait_for(fetch_db_ws(), timeout=3.0)
