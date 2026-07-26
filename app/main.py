@@ -236,21 +236,20 @@ async def websocket_endpoint(websocket: WebSocket):
     import json
     stream_sid = None
     
-    try:
-        # Wait for the start event
-        for _ in range(5): # Don't loop forever
-            data = await websocket.receive_text()
-            msg = json.loads(data)
-            if msg.get("event") == "start":
-                stream_sid = msg["start"]["streamSid"]
-                
-                # Prevention of duplicate session creation
-                if stream_sid in ACTIVE_STREAMS:
-                    logger.warning(f"Duplicate WebSocket connection for stream {stream_sid}. Rejecting.")
-                    return
-                ACTIVE_STREAMS.add(stream_sid)
-                
-                # Extract custom parameters from the start event
+    # Wait for the start event
+    for _ in range(5): # Don't loop forever
+        data = await websocket.receive_text()
+        msg = json.loads(data)
+        if msg.get("event") == "start":
+            stream_sid = msg["start"]["streamSid"]
+            
+            # Prevention of duplicate session creation
+            if stream_sid in ACTIVE_STREAMS:
+                logger.warning(f"Duplicate WebSocket connection for stream {stream_sid}. Rejecting.")
+                return
+            ACTIVE_STREAMS.add(stream_sid)
+            
+            # Extract custom parameters from the start event
             custom_params = msg["start"].get("customParameters", {})
             phone_number = custom_params.get("phone", "unknown_client")
             client_id_str = custom_params.get("client_id", "")
