@@ -235,10 +235,8 @@ async def websocket_endpoint(websocket: WebSocket):
     # Twilio sends a 'connected' event, then a 'start' event
     import json
     stream_sid = None
-    
-    try:
-        # Wait for the start event
-        for _ in range(5): # Don't loop forever
+    # Wait for the start event
+    for _ in range(5): # Don't loop forever
             data = await websocket.receive_text()
             msg = json.loads(data)
             if msg.get("event") == "start":
@@ -250,25 +248,25 @@ async def websocket_endpoint(websocket: WebSocket):
                     return
                 ACTIVE_STREAMS.add(stream_sid)
                 
-                # Extract custom parameters from the start event
-            custom_params = msg["start"].get("customParameters", {})
-            phone_number = custom_params.get("phone", "unknown_client")
-            client_id_str = custom_params.get("client_id", "")
-            company_context = custom_params.get("company_context", "")
-            webhook_processing_start = float(custom_params.get("webhook_processing_start", 0.0))
-            
-            first_audio_packet = time.perf_counter()
-            connection_metrics = {
-                "webhook_processing_start": webhook_processing_start,
-                "media_stream_connection": media_stream_connection,
-                "first_audio_packet": first_audio_packet,
-            }
-            masked_phone = f"{phone_number[:3]}******{phone_number[-4:]}" if len(phone_number) > 7 and phone_number != "unknown_client" else phone_number
-            logger.info(f"Twilio stream started: {stream_sid} | phone: {masked_phone} | client_id: {client_id_str}")
-            break
-        elif msg.get("event") == "connected":
-            logger.info("Twilio connected event received")
-            continue
+             # Extract custom parameters from the start event
+                custom_params = msg["start"].get("customParameters", {})
+                phone_number = custom_params.get("phone", "unknown_client")
+                client_id_str = custom_params.get("client_id", "")
+                company_context = custom_params.get("company_context", "")
+                webhook_processing_start = float(custom_params.get("webhook_processing_start", 0.0))
+                
+                first_audio_packet = time.perf_counter()
+                connection_metrics = {
+                    "webhook_processing_start": webhook_processing_start,
+                    "media_stream_connection": media_stream_connection,
+                    "first_audio_packet": first_audio_packet,
+                }
+                masked_phone = f"{phone_number[:3]}******{phone_number[-4:]}" if len(phone_number) > 7 and phone_number != "unknown_client" else phone_number
+                logger.info(f"Twilio stream started: {stream_sid} | phone: {masked_phone} | client_id: {client_id_str}")
+                break
+            elif msg.get("event") == "connected":
+                logger.info("Twilio connected event received")
+                continue
             
     if not stream_sid:
         logger.error("Did not receive 'start' event from Twilio")
