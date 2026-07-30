@@ -13,7 +13,7 @@ class LatencyFillerProcessor(FrameProcessor):
     Monitors transcription frames and plays a short filler audio 
     if the LLM response is delayed by more than a given threshold.
     """
-    def __init__(self, filler_wav_paths: list[str] = None, delay_threshold_ms: int = 400, **kwargs):
+    def __init__(self, filler_wav_paths: list[str] = None, delay_threshold_ms: int = 400, event_bus = None, session_id = None, **kwargs):
         super().__init__(**kwargs)
         if filler_wav_paths is None:
             filler_wav_paths = ["hmm.wav", "wait_a_minute.wav", "let_me_think.wav"]
@@ -21,7 +21,12 @@ class LatencyFillerProcessor(FrameProcessor):
         self.delay_threshold = delay_threshold_ms / 1000.0
         self._wait_task = None
         self._audio_frames_list = []
+        self.event_bus = event_bus
+        self.session_id = session_id
         
+        if self.event_bus and self.session_id:
+            asyncio.create_task(self._subscribe_to_events())
+            
         # Preload all audio files
         import random
         import soundfile as sf
@@ -76,6 +81,18 @@ class LatencyFillerProcessor(FrameProcessor):
         except asyncio.CancelledError:
             # Task was cancelled because LLM responded fast enough!
             logger.debug("Filler wait task cancelled, LLM responded fast.")
+
+    async def _subscribe_to_events(self):
+        async def cancel_wait(event):
+            if event.session_id == self.session_id:
+                if self._wait_task and not self._wait_task.done():
+                    self._wait_task.cancel()
+                    logger.debug("Filler wait task cancelled by EventBus event.")
+                self._wait_task = None
+                
+        await self.event_bus.subscribe("ThinkingStarted", cancel_wait)
+        await self.event_bus.subscribe("ResponseGenerated", cancel_wait)
+        await self.event_bus.subscribe("SpeakingStarted", cancel_wait)
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)

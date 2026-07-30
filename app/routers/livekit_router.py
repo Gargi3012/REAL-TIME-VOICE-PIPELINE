@@ -87,6 +87,21 @@ async def join_livekit_room(request: dict = None):
         raise HTTPException(status_code=500, detail=f"Failed to generate token: {str(e)}")
 
 
+@router.post("/api/twilio/outbound")
+async def trigger_outbound_call(payload: dict):
+    phone_number = payload.get("phoneNumber")
+    if not phone_number:
+        raise HTTPException(status_code=400, detail="phoneNumber is required")
+        
+    try:
+        from Pillar_2.outbound_call import place_outbound_call
+        call_sid = await asyncio.to_thread(place_outbound_call, phone_number)
+        return {"status": "success", "callSid": call_sid}
+    except Exception as e:
+        logger.exception(f"Failed to place outbound call: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.websocket("/ws/frontend")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
