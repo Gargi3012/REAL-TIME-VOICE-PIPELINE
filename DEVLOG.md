@@ -820,3 +820,18 @@ Migrated the company FAQ knowledge base from a static JSON file (`app/llm/knowle
 ### Conclusion
 The Company FAQ feature is now database-backed rather than file-backed, making it straightforward to add, edit, or manage FAQ entries going forward (e.g. via an admin script or future interface) without requiring a code deploy.
 
+---
+
+## Milestone — Pillar 2: Pipeline Stability & Voice Quality Improvements
+**Date**: 2026-07-30
+**Status**: ✅ Complete — Implemented and Tested
+
+### Overview
+A focused stability sprint under Pillar 2 to fix critical real-time conversational issues that surfaced during live Twilio call testing. This includes resolving latency filler audio overlaps, upgrading the Cartesia TTS engine to the latest production model, and patching pipeline teardown warnings.
+
+### Actions Taken
+- **Resolved Latency Filler Overlaps**: Subscribed `LatencyFillerProcessor` to the pipeline `EventBus` to immediately cancel latency filler playback tasks (`let me think`, `hmm`) when the LLM starts generating or TTS starts playing. This prevents filler audio from overlapping with real bot responses.
+- **Cartesia Model Upgrade**: Upgraded Cartesia TTS from the sunsetted `sonic-multilingual` model to the production-ready, natively multilingual **`sonic-3.5`** model, restoring audio output after `model_sunsetted` errors were observed on live calls.
+- **Hindi/Hinglish Voice Optimization**: Patched `CartesiaTTSService._build_msg` to disable word-level timestamps when using Hindi (`hi`) language, as Cartesia returns a `400 Bad Request` for timestamp requests on that language.
+- **Clean Pipeline Teardown**: Resolved `RuntimeWarning: coroutine 'PipelineWorker.cancel' was never awaited` that appeared during Twilio WebSocket session cleanup.
+- **Arushi (Hinglish Speaker) Voice Integration**: Configured Cartesia Voice ID `95d51f79-c397-46f9-b49a-23763d3eaa2d` (Arushi - Hinglish Speaker) as the default voice with `sonic-3.5` and `language=hi` for natural-sounding Hindi/Hinglish responses.
