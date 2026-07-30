@@ -195,7 +195,7 @@ class MockPipecatProcessor:
 
 # ── Real service factory ──────────────────────────────────────────────
 
-def create_pipecat_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any:
+def create_pipecat_processor(role: ProcessorRole, metadata: dict[str, Any], transport_type: str = "livekit") -> Any:
     """Instantiate the appropriate Pipecat service for a given ProcessorRole.
 
     When pipecat-ai is installed (production), real service objects are
@@ -206,12 +206,13 @@ def create_pipecat_processor(role: ProcessorRole, metadata: dict[str, Any]) -> A
     Args:
         role:     The canonical role this processor fills in the pipeline.
         metadata: Configuration dict forwarded from the ProcessorNode.
+        transport_type: The active transport mode ('livekit' or 'twilio').
 
     Returns:
         A Pipecat-compatible processor object.
     """
     try:
-        return _create_real_processor(role, metadata)
+        return _create_real_processor(role, metadata, transport_type)
     except ImportError as e:
         logger.error(f"MOCK FALLBACK for role={role.value} | REASON: {e}")
         import traceback
@@ -219,7 +220,7 @@ def create_pipecat_processor(role: ProcessorRole, metadata: dict[str, Any]) -> A
         return _create_mock_processor(role)
 
 
-def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any:
+def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any], transport_type: str = "livekit") -> Any:
     """Build a real Pipecat service. Raises ImportError if pipecat-ai is absent."""
     from app.config import (
         DEEPGRAM_API_KEY,
@@ -233,8 +234,7 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
         if not DEEPGRAM_API_KEY:
             raise ValueError("DEEPGRAM_API_KEY is not set in your .env file.")
 
-        from app.config import TRANSPORT_MODE
-        sample_rate = 16000 if TRANSPORT_MODE.lower() == "livekit" else 8000
+        sample_rate = 16000 if transport_type.lower() == "livekit" else 8000
 
         # Call Pillar_2 STT factory
         pillar2_pipeline = _import_pillar2_module("pillar2_pipeline", "pipeline.py")
@@ -343,10 +343,10 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
             return ResilientLLMProcessor(llm, fallback_llm_factory)
 
     elif role == ProcessorRole.TTS:
-        from app.config import TTS_PROVIDER, TRANSPORT_MODE
+        from app.config import TTS_PROVIDER
         
         provider = metadata.get("provider", TTS_PROVIDER)
-        sample_rate = 16000 if TRANSPORT_MODE.lower() == "livekit" else 8000
+        sample_rate = 16000 if transport_type.lower() == "livekit" else 8000
         
         if provider == "elevenlabs":
             from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
@@ -404,9 +404,22 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any]) -> Any
             tts = CartesiaTTSService(
                 api_key=CARTESIA_API_KEY,
                 voice_id=voice_id,
+                settings=CartesiaTTSService.Settings(
+                    voice=voice_id,
+                    model="sonic-3.5",
+                    language="hi",
+                ),
                 sample_rate=sample_rate,
             )
-            logger.info("CartesiaTTSService created | voice_id={v}", v=voice_id)
+            
+            # Monkey-patch _build_msg to disable timestamps because language 'hi' does not support them
+            orig_build_msg = tts._build_msg
+            def custom_build_msg(*args, **kwargs):
+                kwargs["add_timestamps"] = False
+                return orig_build_msg(*args, **kwargs)
+            tts._build_msg = custom_build_msg
+
+            logger.info("CartesiaTTSService created | voice_id={v} | model=sonic-3.5 | language=hi (timestamps disabled)", v=voice_id)
             return tts
 
         else:

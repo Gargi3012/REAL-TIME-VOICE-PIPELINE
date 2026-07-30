@@ -33,7 +33,7 @@ def test_create_pipecat_processor_success(mock_create_real):
 
     result = create_pipecat_processor(ProcessorRole.STT, {})
     assert result is mock_real
-    mock_create_real.assert_called_once_with(ProcessorRole.STT, {})
+    mock_create_real.assert_called_once_with(ProcessorRole.STT, {}, "livekit")
 
 
 @patch("app.adapters.pipecat.processors._create_real_processor", side_effect=ImportError("No pipecat"))
@@ -42,7 +42,7 @@ def test_create_pipecat_processor_fallback(mock_create_real):
     result = create_pipecat_processor(ProcessorRole.STT, {})
     assert isinstance(result, MockPipecatProcessor)
     assert result.name == "MockSTT"
-    mock_create_real.assert_called_once_with(ProcessorRole.STT, {})
+    mock_create_real.assert_called_once_with(ProcessorRole.STT, {}, "livekit")
 
 
 @patch("app.config.DEEPGRAM_API_KEY", "test_key")

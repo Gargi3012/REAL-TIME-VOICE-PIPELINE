@@ -73,6 +73,14 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to initialize database on startup (will degrade gracefully): {e}")
         # We do not crash the app so that we don't break the pipeline if DB is temporarily down.
 
+    # Pre-load FAQ context cache on startup
+    try:
+        from app.llm.company_faq import refresh_faq_cache
+        await refresh_faq_cache()
+        logger.info("FAQ cache refreshed successfully on startup.")
+    except Exception as faq_err:
+        logger.error(f"Failed to refresh FAQ cache on startup: {faq_err}")
+
     # Mark as ready regardless of DB to allow graceful degradation
     APP_STATE["is_ready"] = True
     
@@ -105,12 +113,6 @@ if os.getenv("ENVIRONMENT", "development").lower() == "development":
 if not allowed_origins:
     logger.warning("No ALLOWED_ORIGINS set in environment. Restricting to strict localhost.")
     allowed_origins = ["http://localhost:8000"]
-
-
-@app.on_event("startup")
-async def load_faq_cache_on_startup():
-    from app.llm.company_faq import refresh_faq_cache
-    await refresh_faq_cache()
 
 app.add_middleware(
     CORSMiddleware,
@@ -664,7 +666,10 @@ async def run_voice_session(
         if adapter and getattr(adapter, 'task', None):
             try:
                 if hasattr(adapter.task, 'cancel'):
-                    adapter.task.cancel()
+                    import inspect
+                    cancel_res = adapter.task.cancel()
+                    if inspect.iscoroutine(cancel_res):
+                        await cancel_res
                     logger.info("Pipecat adapter task cancelled.")
             except Exception as cancel_err:
                 logger.warning(f"Error canceling Pipecat adapter task: {cancel_err}")

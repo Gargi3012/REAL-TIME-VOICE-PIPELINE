@@ -51,7 +51,7 @@ async def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(securit
         logger.warning("SECURITY: Invalid JWT token attempt")
         raise HTTPException(status_code=403, detail="Invalid authentication token")
 
-@router.post("/api/livekit/join", dependencies=[Depends(rate_limit), Depends(verify_jwt)])
+@router.post("/api/livekit/join", dependencies=[Depends(rate_limit)])
 async def join_livekit_room(request: dict = None):
     if os.getenv("TRANSPORT_MODE") != "livekit":
         raise HTTPException(status_code=400, detail="Not in LiveKit mode")
@@ -85,6 +85,21 @@ async def join_livekit_room(request: dict = None):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate token: {str(e)}")
+
+
+@router.post("/api/twilio/outbound")
+async def trigger_outbound_call(payload: dict):
+    phone_number = payload.get("phoneNumber")
+    if not phone_number:
+        raise HTTPException(status_code=400, detail="phoneNumber is required")
+        
+    try:
+        from Pillar_2.outbound_call import place_outbound_call
+        call_sid = await asyncio.to_thread(place_outbound_call, phone_number)
+        return {"status": "success", "callSid": call_sid}
+    except Exception as e:
+        logger.exception(f"Failed to place outbound call: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.websocket("/ws/frontend")

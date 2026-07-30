@@ -3,6 +3,10 @@ class UIManager {
         // Elements
         this.btnJoin = document.getElementById('btn-join');
         this.btnLeave = document.getElementById('btn-leave');
+        this.btnCallPhone = document.getElementById('btn-call-phone');
+        this.phoneInput = document.getElementById('phone-input');
+        this.callingModeSelect = document.getElementById('calling-mode-select');
+        this.phoneInputContainer = document.getElementById('phone-input-container');
         this.dot = document.getElementById('connection-dot');
         this.connText = document.getElementById('connection-text');
         this.chatHistory = document.getElementById('chat-history');
@@ -37,6 +41,9 @@ class UIManager {
                 this.connText.textContent = 'Disconnected';
                 this.btnJoin.disabled = false;
                 this.btnLeave.disabled = true;
+                if (this.btnCallPhone) this.btnCallPhone.disabled = false;
+                if (this.phoneInput) this.phoneInput.disabled = false;
+                if (this.callingModeSelect) this.callingModeSelect.disabled = false;
                 this.setStatus('Ready to connect');
                 break;
             case 'connecting':
@@ -44,12 +51,18 @@ class UIManager {
                 this.connText.textContent = 'Connecting...';
                 this.btnJoin.disabled = true;
                 this.btnLeave.disabled = true;
+                if (this.btnCallPhone) this.btnCallPhone.disabled = true;
+                if (this.phoneInput) this.phoneInput.disabled = true;
+                if (this.callingModeSelect) this.callingModeSelect.disabled = true;
                 break;
             case 'connected':
                 this.dot.classList.add('connected');
                 this.connText.textContent = 'Connected ✓';
                 this.btnJoin.disabled = true;
                 this.btnLeave.disabled = false;
+                if (this.btnCallPhone) this.btnCallPhone.disabled = true;
+                if (this.phoneInput) this.phoneInput.disabled = true;
+                if (this.callingModeSelect) this.callingModeSelect.disabled = true;
                 this.setStatus('Waiting for greeting...');
                 break;
         }
@@ -154,11 +167,22 @@ class VoicePipelineClient {
         
         this.bindEvents();
         this.checkConfig();
+        
+        // Sync calling mode on initial load
+        if (this.ui.callingModeSelect) {
+            this.handleCallingModeChange(this.ui.callingModeSelect.value);
+        }
     }
 
     bindEvents() {
         this.ui.btnJoin.addEventListener('click', () => this.joinCall());
         this.ui.btnLeave.addEventListener('click', () => this.leaveCall());
+        if (this.ui.btnCallPhone) {
+            this.ui.btnCallPhone.addEventListener('click', () => this.callPhone());
+        }
+        if (this.ui.callingModeSelect) {
+            this.ui.callingModeSelect.addEventListener('change', (e) => this.handleCallingModeChange(e.target.value));
+        }
     }
 
     async checkConfig() {
@@ -298,6 +322,55 @@ class VoicePipelineClient {
         }
         this.ui.setConnectionState('disconnected');
         this.ui.addMessage('System', 'Disconnected from call', {});
+    }
+
+    async callPhone() {
+        const phoneNumber = this.ui.phoneInput.value.trim();
+        if (!phoneNumber) {
+            this.ui.showToast('Please enter a phone number in E.164 format (e.g. +91XXXXXXXXXX)');
+            return;
+        }
+
+        this.ui.setConnectionState('connecting');
+        this.ui.setStatus('Dialing phone...', true, false);
+        this.ui.updateMetrics(0, '-', '-');
+
+        try {
+            const response = await fetch('/api/twilio/outbound', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ phoneNumber: phoneNumber })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.detail || 'Failed to place outbound call');
+            }
+
+            const data = await response.json();
+            this.ui.showToast('Outbound call triggered successfully!', 'success');
+            
+            // Set connection state to connected when Twilio call connects (indicated by WebSocket bridge events downstream)
+            this.ui.setConnectionState('connected');
+            this.ui.setStatus('Call active on SIM. Talking...', false, true);
+
+        } catch (error) {
+            console.error(error);
+            this.ui.showToast(error.message);
+            this.ui.setConnectionState('disconnected');
+        }
+    }
+
+    handleCallingModeChange(mode) {
+        if (mode === 'webrtc') {
+            this.ui.btnJoin.classList.remove('hidden');
+            if (this.ui.phoneInputContainer) this.ui.phoneInputContainer.classList.add('hidden');
+        } else if (mode === 'twilio_outbound') {
+            this.ui.btnJoin.classList.add('hidden');
+            if (this.ui.phoneInputContainer) this.ui.phoneInputContainer.classList.remove('hidden');
+        }
     }
 }
 

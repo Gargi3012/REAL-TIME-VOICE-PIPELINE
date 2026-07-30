@@ -15,8 +15,12 @@
                 <img src="logo.jpg" alt="Cybernauts Logo" class="logo-icon" />
                 <h1>Cybernauts</h1>
             </div>
-            <div id="transport-mode-indicator" class="transport-indicator">
-                Checking mode...
+            <div class="mode-selector-container">
+                <select id="calling-mode-select" class="mode-select">
+                    <option value="webrtc">Browser (WebRTC) Mode</option>
+                    <option value="twilio_outbound">SIM-Based Calling (Twilio)</option>
+                </select>
+                <span id="transport-mode-indicator" class="transport-indicator hidden">Checking mode...</span>
             </div>
         </header>
 
@@ -30,6 +34,10 @@
                 </div>
                 <div class="connection-actions">
                     <button id="btn-join" class="btn btn-primary">Join Call</button>
+                    <div id="phone-input-container" class="phone-call-container hidden">
+                        <input type="tel" id="phone-input" placeholder="+91 XXXXX XXXXX" class="phone-input" />
+                        <button id="btn-call-phone" class="btn btn-phone">Join Call</button>
+                    </div>
                     <button id="btn-leave" class="btn btn-secondary" disabled>Leave Call</button>
                 </div>
             </section>
