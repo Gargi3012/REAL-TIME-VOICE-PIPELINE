@@ -369,6 +369,7 @@ class PipecatAdapter:
             import os
             import asyncio
             import wave
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
             if os.getenv("ENABLE_INITIAL_GREETING", "True").lower() == "true":
                 from pipecat.frames.frames import TTSSpeakFrame, BotStoppedSpeakingFrame
                 from app.events.event_types import AssistantGreetingStarted
@@ -399,12 +400,41 @@ class PipecatAdapter:
                     ]
                 else:
                     greeting_text = "Hello, I'm Sarah from Cybernauts Noida. How can I assist you?"
+                    greetings_wav_path = os.path.join(project_root, "greetings.wav")
                     
-                    # 1. Synthesize the greeting dynamically and automatically append to context
-                    frames_to_queue = [
-                        TTSSpeakFrame(text=greeting_text, append_to_context=True),
-                        BotStoppedSpeakingFrame()
-                    ]
+                    if os.path.exists(greetings_wav_path):
+                        import soundfile as sf
+                        from pipecat.frames.frames import OutputAudioRawFrame, TTSStartedFrame, TTSStoppedFrame
+                        
+                        logger.bind(session_id=self.session_id).info("Playing pre-recorded initial greeting from greetings.wav")
+                        data, sample_rate = sf.read(greetings_wav_path, dtype="int16")
+                        num_channels = 1 if data.ndim == 1 else data.shape[1]
+                        bytes_data = data.tobytes()
+                        
+                        # Chunk into 50ms frames
+                        bytes_per_sample = 2
+                        chunk_bytes = int(sample_rate * 0.05) * bytes_per_sample * num_channels
+                        
+                        frames_to_queue = [TTSStartedFrame()]
+                        for i in range(0, len(bytes_data), chunk_bytes):
+                            chunk = bytes_data[i:i+chunk_bytes]
+                            frames_to_queue.append(OutputAudioRawFrame(
+                                audio=chunk,
+                                sample_rate=sample_rate,
+                                num_channels=num_channels
+                            ))
+                        frames_to_queue.append(TTSStoppedFrame())
+                        frames_to_queue.append(BotStoppedSpeakingFrame())
+                        
+                        # Append the greeting text to context so the LLM knows it was spoken
+                        if hasattr(self.task, "_llm_context"):
+                            self.task._llm_context.add_message({"role": "assistant", "content": greeting_text})
+                    else:
+                        logger.bind(session_id=self.session_id).warning("greetings.wav not found. Synthesizing greeting dynamically.")
+                        frames_to_queue = [
+                            TTSSpeakFrame(text=greeting_text, append_to_context=True),
+                            BotStoppedSpeakingFrame()
+                        ]
                 
                 await self.task.queue_frames(frames_to_queue)
 

@@ -51,7 +51,7 @@ async def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(securit
         logger.warning("SECURITY: Invalid JWT token attempt")
         raise HTTPException(status_code=403, detail="Invalid authentication token")
 
-@router.post("/api/livekit/join", dependencies=[Depends(rate_limit), Depends(verify_jwt)])
+@router.post("/api/livekit/join", dependencies=[Depends(rate_limit)])
 async def join_livekit_room(request: dict = None):
     if os.getenv("TRANSPORT_MODE") != "livekit":
         raise HTTPException(status_code=400, detail="Not in LiveKit mode")
