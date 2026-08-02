@@ -91,5 +91,17 @@
         "name": "Rahul",
         "phone": "1234567890",
         "project_details": "Interested in developing a basic app; estimated budget discussed was approximately \u20b975,000, depending on features and platform."
+    },
+    {
+        "timestamp": "2026-07-24T16:39:21.702230",
+        "name": "Gargi Sharma",
+        "phone": "79980207356",
+        "project_details": "Sim-based real-time voice helpline with features like automated call flows, WhatsApp & Facebook messenger integration, and AI-powered chatbot."
+    },
+    {
+        "timestamp": "2026-07-25T09:37:34.865550",
+        "name": "\u0915\u093e\u0930\u0915\u093f\u092f\u093e",
+        "phone": "79880207356",
+        "project_details": "Five-page website with payment gateway, budget \u20b950,000. If payment gateway exceeds budget, remove it and recommend the best option."
     }
 ]

@@ -65,6 +65,8 @@ It provides an orchestration framework capable of handling streaming audio and b
 - **Modular TTS**: Byte-streaming synthesized audio playback.
 - **Conversation context**: Long-running conversation awareness.
 - **Lead Capture & Tool Execution**: AI dynamically collects user details and triggers backend actions (`save_lead`).
+- **Multilingual Support**: Real-time conversation across English, Hindi, and Hinglish using Cartesia's `sonic-3.5` multilingual TTS model.
+- **Latency Filler Control**: Smart EventBus-driven cancellation of latency fillers ("let me think") to prevent speaker overlap when LLM responds or speaking starts.
 - **Clean Architecture**: Strong boundary layers and dependency inversion.
 - **Strong test coverage**: 430+ passing unit and integration tests.
 
