@@ -3,6 +3,7 @@ Tests for Pipecat Adapter.
 """
 
 import pytest
+from unittest.mock import patch
 
 from app.events import EventBus
 from app.pipeline.builder import PipelineBuilder
@@ -51,7 +52,10 @@ def test_adapter_initialization_failure(bus: EventBus, monkeypatch: pytest.Monke
 async def test_adapter_run_success(bus: EventBus, pipeline: Pipeline) -> None:
     adapter = PipecatAdapter(pipeline, bus, "session1", "exec1")
     
-    await adapter.run()
+    with patch("pipecat.pipeline.runner.PipelineRunner.run") as mock_run:
+        await adapter.run()
+        mock_run.assert_called_once()
+        
     # If run completes without error, it succeeded.
     # Check that events were fired
     assert bus._queue.qsize() > 0
