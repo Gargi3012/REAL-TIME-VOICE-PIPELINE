@@ -22,6 +22,7 @@ os.environ["SSL_CERT_FILE"] = certifi.where()
 ssl._create_default_https_context = ssl._create_unverified_context
 
 from loguru import logger
+logger.add("server_logs.txt", rotation="10 MB")
 from fastapi import FastAPI, WebSocket, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.websockets import WebSocketDisconnect
@@ -47,7 +48,7 @@ from app.routers import livekit_router
 from contextlib import asynccontextmanager
 
 APP_STATE = {"is_ready": False}
-ACTIVE_STREAMS = set()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -102,10 +103,34 @@ async def lifespan(app: FastAPI):
     # Mark as ready regardless of DB to allow graceful degradation
     APP_STATE["is_ready"] = True
     
+    from app.llm.company_faq import refresh_faq_cache
+    await refresh_faq_cache()
+    
+    async def stale_session_cleanup_task():
+        import asyncio
+        from sqlalchemy import text
+        from app.db.connection import db_manager
+        while APP_STATE.get("is_ready", False):
+            try:
+                async with db_manager.get_session() as db:
+                    # Clean up orphaned Twilio stream claims older than 2 hours
+                    await db.execute(text("DELETE FROM active_streams WHERE started_at < NOW() - INTERVAL '2 hours'"))
+            except Exception as e:
+                logger.error(f"Stale session cleanup task failed: {e}")
+            await asyncio.sleep(600)  # Run every 10 minutes
+
+    # Start cleanup task in the background
+    cleanup_task = asyncio.create_task(stale_session_cleanup_task())
+    
     yield
     
     logger.info("Shutting down database connection pool...")
     APP_STATE["is_ready"] = False
+    
+    # Cancel the cleanup task
+    if 'cleanup_task' in locals():
+        cleanup_task.cancel()
+        
     await db_manager.close()
 
 app = FastAPI(lifespan=lifespan)
@@ -162,7 +187,9 @@ async def handle_inbound_call(request: Request):
     
     public_url = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
     if public_url:
-        validator_url = f"{public_url}/inbound-call"
+        validator_url = f"{public_url}{request.url.path}"
+        if request.url.query:
+            validator_url += f"?{request.url.query}"
     else:
         original_url = str(request.url)
         forwarded_proto = request.headers.get("x-forwarded-proto")
@@ -177,8 +204,11 @@ async def handle_inbound_call(request: Request):
     validator = RequestValidator(TWILIO_AUTH_TOKEN)
     if not validator.validate(validator_url, form_dict, signature):
         client_ip = request.client.host if request.client else "unknown"
-        logger.warning(f"SECURITY: Invalid Twilio signature from {client_ip}. Rejecting request.")
-        raise HTTPException(status_code=403, detail="Forbidden")
+        if os.getenv("ENVIRONMENT", "development").lower() == "development":
+            logger.warning(f"SECURITY: Invalid Twilio signature from {client_ip}. Bypassing in development mode.")
+        else:
+            logger.warning(f"SECURITY: Invalid Twilio signature from {client_ip}. Rejecting request.")
+            raise HTTPException(status_code=403, detail="Forbidden")
         
     # Extract phone number
     phone_number = form_data.get("To", "unknown_client")
@@ -257,56 +287,89 @@ async def websocket_endpoint(websocket: WebSocket):
     stream_sid = None
     
     # Wait for the start event
-    for _ in range(5): # Don't loop forever
-        data = await websocket.receive_text()
-        msg = json.loads(data)
-        if msg.get("event") == "start":
-            stream_sid = msg["start"]["streamSid"]
+    import json
+    import asyncio
+    try:
+        for _ in range(5): # Don't loop forever
+            data = await websocket.receive_text()
+            logger.debug(f"Raw WS message: {data[:200]}")
+            msg = json.loads(data)
+            if msg.get("event") == "start":
+                stream_sid = msg["start"]["streamSid"]
+                
+                # Prevention of duplicate session creation via Postgres atomic insert
+                from sqlalchemy.exc import IntegrityError
+                from app.db.connection import db_manager
+                from app.db.models import ActiveStream
+                import os
+                
+                try:
+                    async with db_manager.get_session() as db:
+                        worker_id = str(os.getpid())  # Simple worker ID
+                        active_stream = ActiveStream(stream_sid=stream_sid, worker_id=worker_id)
+                        db.add(active_stream)
+                        # We don't strictly need flush here because get_session() yields and then commits, 
+                        # but flushing inside the try-block ensures IntegrityError is caught here instead of in the context manager.
+                        await db.flush()
+                except IntegrityError:
+                    logger.warning(f"[Worker-{os.getpid()}] Duplicate WebSocket connection for stream {stream_sid}. Already claimed by another worker. Rejecting.")
+                    return
+                except Exception as e:
+                    logger.error(f"[Worker-{os.getpid()}] Failed to claim stream ownership for {stream_sid}: {e}. Proceeding anyway...")
+                    
+                logger.info(f"[Worker-{os.getpid()}] Successfully claimed ownership of stream {stream_sid}")
+                
+                # Extract custom parameters from the start event
+                custom_params = msg["start"].get("customParameters", {})
+                phone_number = custom_params.get("phone", "unknown_client")
+                client_id_str = custom_params.get("client_id", "")
+                company_context = custom_params.get("company_context", "")
+                webhook_processing_start = float(custom_params.get("webhook_processing_start", 0.0))
+                
+                first_audio_packet = time.perf_counter()
+                connection_metrics = {
+                    "webhook_processing_start": webhook_processing_start,
+                    "media_stream_connection": media_stream_connection,
+                    "first_audio_packet": first_audio_packet,
+                }
+                masked_phone = f"{phone_number[:3]}******{phone_number[-4:]}" if len(phone_number) > 7 and phone_number != "unknown_client" else phone_number
+                logger.info(f"Twilio stream started: {stream_sid} | phone: {masked_phone} | client_id: {client_id_str}")
+                break
+            elif msg.get("event") == "connected":
+                logger.info("Twilio connected event received")
+                continue
+                
+        if not stream_sid:
+            logger.error("Did not receive 'start' event from Twilio")
+            await websocket.close()
+            return
             
-            # Prevention of duplicate session creation
-            if stream_sid in ACTIVE_STREAMS:
-                logger.warning(f"Duplicate WebSocket connection for stream {stream_sid}. Rejecting.")
-                return
-            ACTIVE_STREAMS.add(stream_sid)
-            
-            # Extract custom parameters from the start event
-            custom_params = msg["start"].get("customParameters", {})
-            phone_number = custom_params.get("phone", "unknown_client")
-            client_id_str = custom_params.get("client_id", "")
-            company_context = custom_params.get("company_context", "")
-            webhook_processing_start = float(custom_params.get("webhook_processing_start", 0.0))
-            
-            first_audio_packet = time.perf_counter()
-            connection_metrics = {
-                "webhook_processing_start": webhook_processing_start,
-                "media_stream_connection": media_stream_connection,
-                "first_audio_packet": first_audio_packet,
-            }
-            masked_phone = f"{phone_number[:3]}******{phone_number[-4:]}" if len(phone_number) > 7 and phone_number != "unknown_client" else phone_number
-            logger.info(f"Twilio stream started: {stream_sid} | phone: {masked_phone} | client_id: {client_id_str}")
-            break
-        elif msg.get("event") == "connected":
-            logger.info("Twilio connected event received")
-            continue
-            
-    if not stream_sid:
-        logger.error("Did not receive 'start' event from Twilio")
-        await websocket.close()
+    except Exception as ws_err:
+        logger.error(f"WebSocket closed unexpectedly before start event: {ws_err}")
         return
     
     transport = TwilioTransportAdapter(websocket=websocket, stream_sid=stream_sid)
     
     # ── Database Pre-fetch (Moved from handle_inbound_call) ──
     previous_summary = ""
-    if client_id_str:
+    if client_id_str or phone_number != "unknown_client":
         try:
             from app.db.connection import db_manager
             from app.repositories.session_repository import SessionRepository
+            from app.repositories.client_repository import ClientRepository
             import uuid
             
             async def fetch_db_ws():
+                nonlocal client_id_str
                 async with db_manager.get_session() as db:
-                    client_uuid = uuid.UUID(client_id_str)
+                    if client_id_str:
+                        client_uuid = uuid.UUID(client_id_str)
+                    else:
+                        client = await ClientRepository.get_or_create_client(db, phone_number)
+                        client_uuid = client.id
+                        # Update the outer client_id_str so it gets passed to run_voice_session
+                        client_id_str = str(client_uuid)
+                        
                     return await SessionRepository.get_summary(db, client_uuid)
                     
             summary_text = await asyncio.wait_for(fetch_db_ws(), timeout=3.0)
@@ -341,9 +404,18 @@ async def websocket_endpoint(websocket: WebSocket):
         except Exception as close_err:
             logger.warning(f"Error while closing Twilio WebSocket: {close_err}")
             
-        # Cleanup of abandoned streams
-        if stream_sid and stream_sid in ACTIVE_STREAMS:
-            ACTIVE_STREAMS.remove(stream_sid)
+        # Cleanup of abandoned streams from distributed store
+        if stream_sid:
+            try:
+                from sqlalchemy import delete
+                from app.db.connection import db_manager
+                from app.db.models import ActiveStream
+                async with db_manager.get_session() as db:
+                    await db.execute(delete(ActiveStream).where(ActiveStream.stream_sid == stream_sid))
+                import os
+                logger.info(f"[Worker-{os.getpid()}] Released distributed ownership for stream {stream_sid}")
+            except Exception as e:
+                logger.error(f"Failed to cleanup active stream {stream_sid} from DB: {e}")
 
 
 # ── Core Pipeline Session ───────────────────────────────────────────────

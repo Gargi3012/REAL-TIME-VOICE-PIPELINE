@@ -75,6 +75,24 @@
         "phone": "70829680702"
     },
     {
+        "timestamp": "2026-07-26T12:48:55.950402",
+        "name": "Rahul",
+        "phone": "0708 2968 0702",
+        "project_details": "Career recommendation website for children, including student and admin dashboards, assessments, recommendations, learning roadmap, and progress tracking. Estimated budget \u20b92.5\u20133 lakh; timeline approximately 2.5 months."
+    },
+    {
+        "timestamp": "2026-07-27T00:44:02.680892",
+        "name": "\u0930\u093e\u0939\u0941\u0932",
+        "phone": "070829680702",
+        "project_details": "Basic website \u092c\u0928\u0935\u093e\u0928\u0940 \u0939\u0948\u0964"
+    },
+    {
+        "timestamp": "2026-07-27T00:52:22.135450",
+        "name": "Rahul",
+        "phone": "1234567890",
+        "project_details": "Interested in developing a basic app; estimated budget discussed was approximately \u20b975,000, depending on features and platform."
+    },
+    {
         "timestamp": "2026-07-24T16:39:21.702230",
         "name": "Gargi Sharma",
         "phone": "79980207356",
@@ -85,5 +103,29 @@
         "name": "\u0915\u093e\u0930\u0915\u093f\u092f\u093e",
         "phone": "79880207356",
         "project_details": "Five-page website with payment gateway, budget \u20b950,000. If payment gateway exceeds budget, remove it and recommend the best option."
+    },
+    {
+        "timestamp": "2026-08-02T20:09:03.382005",
+        "name": "Rahul",
+        "phone": "7096870202",
+        "project_details": "B2B real-time AI communication platform for automated inbound and outbound calling, replacing human callers for lead generation. Industry-specific scripts, workflows, and requirements should be customizable. Requesting a budget estimate."
+    },
+    {
+        "timestamp": "2026-08-02T20:11:26.254724",
+        "name": "Rahul",
+        "phone": "7082968702",
+        "project_details": "B2B real-time AI communication platform for automated inbound and outbound calling, replacing human callers for lead generation. Industry-specific scripts, workflows, and requirements should be customizable. Requesting a budget estimate."
+    },
+    {
+        "timestamp": "2026-08-02T21:23:28.513397",
+        "name": "\u091a\u093f\u091a\u0902\u0917\u091b\u0947\u092f\u093e",
+        "phone": "9191919191",
+        "project_details": "Project named Care Stance; user requested a call and cost estimate."
+    },
+    {
+        "timestamp": "2026-08-02T21:23:53.565411",
+        "name": "\u091a\u093f\u091a\u0902\u0917\u091b\u0947\u092f\u093e",
+        "phone": "7082968702",
+        "project_details": "Corrected phone number for Care Stance project call-back; previous number was incorrect."
     }
 ]
