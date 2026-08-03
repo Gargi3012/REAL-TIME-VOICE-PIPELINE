@@ -147,6 +147,8 @@ def _build_real_pipeline_task(
     from pipecat.services.openai.llm import OpenAILLMService
     from pipecat.pipeline.pipeline import Pipeline as PipecatPipeline
     
+    context = None
+    
     # We need to find the LLM to attach the aggregator
     llm = next((p for p in pipecat_processors if isinstance(p, (GroqLLMService, OpenAILLMService)) or p.__class__.__name__ == "ResilientLLMProcessor"), None)
     
@@ -383,6 +385,9 @@ class PipecatAdapter:
 
             # 2. Try to build a real PipelineTask; fall back to mock on ImportError or Mock transport
             try:
+                import sys
+                is_testing = "pytest" in sys.modules or os.getenv("TESTING") == "True" or os.getenv("CI") == "True"
+                
                 if self.transport and "Mock" in type(self.transport).__name__:
                     raise ImportError("Force mock fallback for tests")
                 if any("Mock" in type(p).__name__ for p in self.pipecat_processors):
@@ -400,17 +405,23 @@ class PipecatAdapter:
                     "Real pipecat PipelineTask created"
                 )
             except ImportError as e:
-                logger.exception(e)
-                logger.bind(session_id=self.session_id).warning(
-                    "pipecat-ai not installed — using MockPipecatPipelineTask"
-                )
-                if self.transport:
-                    real_t = self.transport.get_pipecat_transport()
-                    self.pipecat_processors.insert(0, real_t)
-                self.task = MockPipecatPipelineTask(
-                    processors=self.pipecat_processors,
-                    event_handler=self.bridge,
-                )
+                if is_testing:
+                    logger.exception(e)
+                    logger.bind(session_id=self.session_id).warning(
+                        "pipecat-ai not installed — using MockPipecatPipelineTask"
+                    )
+                    if self.transport:
+                        real_t = self.transport.get_pipecat_transport()
+                        self.pipecat_processors.insert(0, real_t)
+                    self.task = MockPipecatPipelineTask(
+                        processors=self.pipecat_processors,
+                        event_handler=self.bridge,
+                    )
+                else:
+                    logger.bind(session_id=self.session_id).error(
+                        "CRITICAL: Failed to create real PipelineTask in production: {err}", err=e
+                    )
+                    raise e
 
             self.lifecycle = PipecatLifecycleManager(self.task, self.session_id)
 
@@ -432,7 +443,6 @@ class PipecatAdapter:
             await self.lifecycle.start()
             
             import os
-            import asyncio
             import wave
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
             if os.getenv("ENABLE_INITIAL_GREETING", "True").lower() == "true":
