@@ -26,11 +26,16 @@ class LanguageRoutingProcessor(FrameProcessor):
         if isinstance(frame, TranscriptionFrame) and frame.text and not frame.user_id == "bot":
             text = frame.text.lower()
             
+            # --- Fix Deepgram Time Formatting Bug ---
+            # Deepgram smart_format sometimes converts spoken numbers like '708' into times like '07:08'.
+            frame.text = re.sub(r'\b0?(\d{1,2}):(\d{2})\b', r'\1\2', frame.text)
+            text = frame.text.lower()
+            
             # --- Check for Goodbye phrases ---
             clean_text = re.sub(r'[^\w\s]', '', text.strip())
-            closing_phrases = ["bye", "goodbye", "good bye", "alvida", "thank you", "thanks", "that is all", "thats all", "bas itna hi", "theek hai", "end call", "disconnect"]
+            closing_pattern = r'\b(bye|goodbye|good bye|alvida|end call|end the call|hang up|disconnect|call cut|call end|phone rakh|band kar|bas itna hi|that is all|thats all)\b'
             
-            if len(clean_text.split()) <= 8 and any(phrase in clean_text for phrase in closing_phrases):
+            if len(clean_text.split()) <= 8 and re.search(closing_pattern, clean_text):
                 logger.info(f"LanguageRoutingProcessor: User said goodbye ('{frame.text}'). Will terminate after bot replies.")
                 self.shared_state["hangup_requested"] = True
             
@@ -69,7 +74,7 @@ class CallTerminationProcessor(FrameProcessor):
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
-        from pipecat.frames.frames import TTSStoppedFrame, EndTaskFrame, TextFrame, AudioRawFrame
+        from pipecat.frames.frames import TTSStoppedFrame, EndFrame, TextFrame, AudioRawFrame, CancelFrame
         
         # Log frame types (skip spammy ones)
         if not isinstance(frame, (AudioRawFrame, TextFrame)):
@@ -77,10 +82,14 @@ class CallTerminationProcessor(FrameProcessor):
             
         await self.push_frame(frame, direction)
         
-        # When bot finishes its response, if hangup requested, queue EndTaskFrame
+        # When bot finishes its response, if hangup requested, queue CancelFrame
         if isinstance(frame, TTSStoppedFrame):
             logger.info(f"CallTerminationProcessor saw TTSStoppedFrame. state: {self.shared_state}")
             if self.shared_state.get("hangup_requested"):
-                logger.warning("CallTerminationProcessor: Bot finished responding to goodbye. Pushing EndTaskFrame to terminate the call.")
-                await self.push_frame(EndTaskFrame(), direction)
+                logger.warning("CallTerminationProcessor: Bot finished responding to goodbye. Terminating the call via master Task.")
+                task = self.shared_state.get("task")
+                if task:
+                    await task.queue_frames([CancelFrame()])
+                else:
+                    await self.push_frame(CancelFrame(), FrameDirection.UPSTREAM)
                 self.shared_state["hangup_requested"] = False

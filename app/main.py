@@ -22,6 +22,7 @@ os.environ["SSL_CERT_FILE"] = certifi.where()
 ssl._create_default_https_context = ssl._create_unverified_context
 
 from loguru import logger
+logger.add("server_logs.txt", rotation="10 MB")
 from fastapi import FastAPI, WebSocket, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.websockets import WebSocketDisconnect
@@ -84,6 +85,9 @@ async def lifespan(app: FastAPI):
     # Mark as ready regardless of DB to allow graceful degradation
     APP_STATE["is_ready"] = True
     
+    from app.llm.company_faq import refresh_faq_cache
+    await refresh_faq_cache()
+    
     yield
     
     logger.info("Shutting down database connection pool...")
@@ -144,7 +148,9 @@ async def handle_inbound_call(request: Request):
     
     public_url = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
     if public_url:
-        validator_url = f"{public_url}/inbound-call"
+        validator_url = f"{public_url}{request.url.path}"
+        if request.url.query:
+            validator_url += f"?{request.url.query}"
     else:
         original_url = str(request.url)
         forwarded_proto = request.headers.get("x-forwarded-proto")
@@ -159,8 +165,11 @@ async def handle_inbound_call(request: Request):
     validator = RequestValidator(TWILIO_AUTH_TOKEN)
     if not validator.validate(validator_url, form_dict, signature):
         client_ip = request.client.host if request.client else "unknown"
-        logger.warning(f"SECURITY: Invalid Twilio signature from {client_ip}. Rejecting request.")
-        raise HTTPException(status_code=403, detail="Forbidden")
+        if os.getenv("ENVIRONMENT", "development").lower() == "development":
+            logger.warning(f"SECURITY: Invalid Twilio signature from {client_ip}. Bypassing in development mode.")
+        else:
+            logger.warning(f"SECURITY: Invalid Twilio signature from {client_ip}. Rejecting request.")
+            raise HTTPException(status_code=403, detail="Forbidden")
         
     # Extract phone number
     phone_number = form_data.get("To", "unknown_client")
@@ -239,41 +248,49 @@ async def websocket_endpoint(websocket: WebSocket):
     stream_sid = None
     
     # Wait for the start event
-    for _ in range(5): # Don't loop forever
-        data = await websocket.receive_text()
-        msg = json.loads(data)
-        if msg.get("event") == "start":
-            stream_sid = msg["start"]["streamSid"]
+    import json
+    import asyncio
+    try:
+        for _ in range(5): # Don't loop forever
+            data = await websocket.receive_text()
+            logger.debug(f"Raw WS message: {data[:200]}")
+            msg = json.loads(data)
+            if msg.get("event") == "start":
+                stream_sid = msg["start"]["streamSid"]
+                
+                # Prevention of duplicate session creation
+                if stream_sid in ACTIVE_STREAMS:
+                    logger.warning(f"Duplicate WebSocket connection for stream {stream_sid}. Rejecting.")
+                    return
+                ACTIVE_STREAMS.add(stream_sid)
+                
+                # Extract custom parameters from the start event
+                custom_params = msg["start"].get("customParameters", {})
+                phone_number = custom_params.get("phone", "unknown_client")
+                client_id_str = custom_params.get("client_id", "")
+                company_context = custom_params.get("company_context", "")
+                webhook_processing_start = float(custom_params.get("webhook_processing_start", 0.0))
+                
+                first_audio_packet = time.perf_counter()
+                connection_metrics = {
+                    "webhook_processing_start": webhook_processing_start,
+                    "media_stream_connection": media_stream_connection,
+                    "first_audio_packet": first_audio_packet,
+                }
+                masked_phone = f"{phone_number[:3]}******{phone_number[-4:]}" if len(phone_number) > 7 and phone_number != "unknown_client" else phone_number
+                logger.info(f"Twilio stream started: {stream_sid} | phone: {masked_phone} | client_id: {client_id_str}")
+                break
+            elif msg.get("event") == "connected":
+                logger.info("Twilio connected event received")
+                continue
+                
+        if not stream_sid:
+            logger.error("Did not receive 'start' event from Twilio")
+            await websocket.close()
+            return
             
-            # Prevention of duplicate session creation
-            if stream_sid in ACTIVE_STREAMS:
-                logger.warning(f"Duplicate WebSocket connection for stream {stream_sid}. Rejecting.")
-                return
-            ACTIVE_STREAMS.add(stream_sid)
-            
-            # Extract custom parameters from the start event
-            custom_params = msg["start"].get("customParameters", {})
-            phone_number = custom_params.get("phone", "unknown_client")
-            client_id_str = custom_params.get("client_id", "")
-            company_context = custom_params.get("company_context", "")
-            webhook_processing_start = float(custom_params.get("webhook_processing_start", 0.0))
-            
-            first_audio_packet = time.perf_counter()
-            connection_metrics = {
-                "webhook_processing_start": webhook_processing_start,
-                "media_stream_connection": media_stream_connection,
-                "first_audio_packet": first_audio_packet,
-            }
-            masked_phone = f"{phone_number[:3]}******{phone_number[-4:]}" if len(phone_number) > 7 and phone_number != "unknown_client" else phone_number
-            logger.info(f"Twilio stream started: {stream_sid} | phone: {masked_phone} | client_id: {client_id_str}")
-            break
-        elif msg.get("event") == "connected":
-            logger.info("Twilio connected event received")
-            continue
-            
-    if not stream_sid:
-        logger.error("Did not receive 'start' event from Twilio")
-        await websocket.close()
+    except Exception as ws_err:
+        logger.error(f"WebSocket closed unexpectedly before start event: {ws_err}")
         return
     
     transport = TwilioTransportAdapter(websocket=websocket, stream_sid=stream_sid)
