@@ -70,6 +70,24 @@ async def lifespan(app: FastAPI):
                     raise retry_err
                 await asyncio.sleep(1.0)
         logger.info("Database connection pool initialized successfully.")
+        
+        # Ensure all database tables (including the new users table) are automatically created
+        try:
+            from app.db.base import Base
+            import app.db.models  # Registers all models (User, Client, etc.) to Base.metadata
+            async with db_manager._engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database schemas created/verified successfully.")
+        except Exception as schema_err:
+            logger.error(f"Failed to create database schemas: {schema_err}")
+        
+        # Seed default admin credentials in the database if table is empty
+        try:
+            from app.services.auth_service import seed_default_user_if_empty
+            async with db_manager.get_session() as db:
+                await seed_default_user_if_empty(db)
+        except Exception as seed_err:
+            logger.error(f"Failed to seed default admin credentials: {seed_err}")
     except Exception as e:
         logger.error(f"Failed to initialize database on startup (will degrade gracefully): {e}")
         # We do not crash the app so that we don't break the pipeline if DB is temporarily down.

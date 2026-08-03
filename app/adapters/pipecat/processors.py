@@ -214,10 +214,16 @@ def create_pipecat_processor(role: ProcessorRole, metadata: dict[str, Any], tran
     try:
         return _create_real_processor(role, metadata, transport_type)
     except ImportError as e:
-        logger.error(f"MOCK FALLBACK for role={role.value} | REASON: {e}")
-        import traceback
-        traceback.print_exc()
-        return _create_mock_processor(role)
+        import sys
+        import os
+        is_testing = "pytest" in sys.modules or os.getenv("TESTING") == "True" or os.getenv("CI") == "True"
+        if is_testing:
+            logger.error(f"MOCK FALLBACK for role={role.value} | REASON: {e}")
+            import traceback
+            traceback.print_exc()
+            return _create_mock_processor(role)
+        else:
+            raise e
 
 
 def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any], transport_type: str = "livekit") -> Any:

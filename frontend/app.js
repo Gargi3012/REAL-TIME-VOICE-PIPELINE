@@ -21,6 +21,13 @@ class UIManager {
         this.twilioOverlay = document.getElementById('twilio-overlay');
         this.transportIndicator = document.getElementById('transport-mode-indicator');
         this.mainContent = document.getElementById('livekit-main');
+        
+        // Auth overlay elements
+        this.authOverlay = document.getElementById('auth-overlay');
+        this.btnLogin = document.getElementById('btn-login');
+        this.authUsername = document.getElementById('auth-username');
+        this.authPassword = document.getElementById('auth-password');
+        this.authToggleLink = document.getElementById('auth-toggle-link');
     }
 
     setTransportMode(mode) {
@@ -165,6 +172,10 @@ class VoicePipelineClient {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         this.WS_URL = `${wsProtocol}//${window.location.host}/ws/frontend`; // Backend WS (Dynamic)
         
+        // Auth token initialization
+        this.token = localStorage.getItem('jwt_token') || '';
+        this.isRegisterMode = false;
+        
         this.bindEvents();
         this.checkConfig();
         
@@ -172,6 +183,9 @@ class VoicePipelineClient {
         if (this.ui.callingModeSelect) {
             this.handleCallingModeChange(this.ui.callingModeSelect.value);
         }
+        
+        // Check if admin is authenticated
+        this.checkAuth();
     }
 
     bindEvents() {
@@ -183,6 +197,97 @@ class VoicePipelineClient {
         if (this.ui.callingModeSelect) {
             this.ui.callingModeSelect.addEventListener('change', (e) => this.handleCallingModeChange(e.target.value));
         }
+        if (this.ui.btnLogin) {
+            this.ui.btnLogin.addEventListener('click', () => this.handleLogin());
+        }
+        if (this.ui.authToggleLink) {
+            this.ui.authToggleLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleAuthMode();
+            });
+        }
+    }
+
+    checkAuth() {
+        if (!this.token) {
+            if (this.ui.authOverlay) {
+                this.ui.authOverlay.classList.remove('hidden');
+            }
+        } else {
+            if (this.ui.authOverlay) {
+                this.ui.authOverlay.classList.add('hidden');
+            }
+        }
+    }
+
+    toggleAuthMode() {
+        this.isRegisterMode = !this.isRegisterMode;
+        const card = this.ui.authOverlay.querySelector('.auth-card');
+        const title = card.querySelector('h2');
+        const subtitle = card.querySelector('.auth-subtitle');
+        const submitBtn = this.ui.btnLogin;
+        const toggleLink = this.ui.authToggleLink;
+
+        if (this.isRegisterMode) {
+            title.textContent = 'Admin Registration';
+            subtitle.textContent = 'Create new administrator credentials';
+            submitBtn.textContent = 'Register';
+            toggleLink.innerHTML = 'Already have an account? Login';
+            this.ui.authUsername.value = '';
+        } else {
+            title.textContent = 'Admin Login';
+            subtitle.textContent = 'Verify credentials to unlock controls';
+            submitBtn.textContent = 'Login';
+            toggleLink.innerHTML = "Don't have an account? Register";
+            this.ui.authUsername.value = 'admin';
+        }
+        this.ui.authPassword.value = '';
+    }
+
+    async handleLogin() {
+        const username = this.ui.authUsername.value.trim();
+        const password = this.ui.authPassword.value;
+        if (!username || !password) {
+            this.ui.showToast('Please fill out both username and password.');
+            return;
+        }
+
+        const endpoint = this.isRegisterMode ? '/api/register' : '/api/login';
+
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.detail || (this.isRegisterMode ? 'Registration failed.' : 'Login failed. Invalid credentials.'));
+            }
+
+            if (this.isRegisterMode) {
+                this.ui.showToast('Registration successful! You can now log in.', 'success');
+                this.toggleAuthMode();
+            } else {
+                const data = await response.json();
+                this.token = data.token;
+                localStorage.setItem('jwt_token', this.token);
+                this.ui.showToast('Logged in successfully!', 'success');
+                this.checkAuth();
+            }
+        } catch (error) {
+            console.error(error);
+            this.ui.showToast(error.message);
+        }
+    }
+
+    getAuthHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.token) {
+            headers['Authorization'] = `Bearer ${this.token}`;
+        }
+        return headers;
     }
 
     async checkConfig() {
@@ -272,7 +377,16 @@ class VoicePipelineClient {
         this.ui.updateMetrics(0, '-', '-');
         try {
             // 1. Get Token from Backend
-            const response = await fetch(`${this.API_BASE}/join`, { method: 'POST' });
+            const response = await fetch(`${this.API_BASE}/join`, { 
+                method: 'POST',
+                headers: this.getAuthHeaders()
+            });
+            if (response.status === 401 || response.status === 403) {
+                this.token = '';
+                localStorage.removeItem('jwt_token');
+                this.checkAuth();
+                throw new Error('Authentication expired or invalid. Please log in again.');
+            }
             if (!response.ok) throw new Error('Failed to fetch LiveKit token. Ensure backend is running.');
             const data = await response.json();
             
@@ -338,11 +452,16 @@ class VoicePipelineClient {
         try {
             const response = await fetch('/api/twilio/outbound', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: this.getAuthHeaders(),
                 body: JSON.stringify({ phoneNumber: phoneNumber })
             });
+
+            if (response.status === 401 || response.status === 403) {
+                this.token = '';
+                localStorage.removeItem('jwt_token');
+                this.checkAuth();
+                throw new Error('Authentication expired or invalid. Please log in again.');
+            }
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));

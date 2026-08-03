@@ -63,25 +63,38 @@ class CallTerminationProcessor(FrameProcessor):
     def __init__(self, shared_state=None, **kwargs):
         super().__init__(**kwargs)
         self.shared_state = shared_state if shared_state is not None else {}
+        self.llm_response_completed = False
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
-        from pipecat.frames.frames import TTSStoppedFrame, EndFrame, TextFrame, AudioRawFrame, CancelFrame
+        from pipecat.frames.frames import (
+            TTSStoppedFrame, EndTaskFrame, TextFrame, AudioRawFrame,
+            TranscriptionFrame, LLMFullResponseEndFrame, CancelFrame
+        )
+        
+        # Reset completed flag when a new user turn starts (user starts speaking/transcribing)
+        if isinstance(frame, TranscriptionFrame) and not getattr(frame, 'user_id', None) == "bot":
+            self.llm_response_completed = False
+            
+        # Set completed flag when LLM finishes generating response text
+        if isinstance(frame, LLMFullResponseEndFrame):
+            self.llm_response_completed = True
         
         # Log frame types (skip spammy ones)
         if not isinstance(frame, (AudioRawFrame, TextFrame)):
-            logger.debug(f"CallTerminationProcessor received: {type(frame).__name__} | hangup_requested={self.shared_state.get('hangup_requested', False)}")
+            logger.debug(f"CallTerminationProcessor received: {type(frame).__name__} | hangup_requested={self.shared_state.get('hangup_requested', False)} | llm_completed={self.llm_response_completed}")
             
         await self.push_frame(frame, direction)
         
-        # When bot finishes its response, if hangup requested, queue CancelFrame
+        # When bot finishes its response, if hangup requested and LLM is done, queue EndTaskFrame or CancelFrame
         if isinstance(frame, TTSStoppedFrame):
-            logger.info(f"CallTerminationProcessor saw TTSStoppedFrame. state: {self.shared_state}")
-            if self.shared_state.get("hangup_requested"):
+            logger.info(f"CallTerminationProcessor saw TTSStoppedFrame. state: {self.shared_state} | llm_completed={self.llm_response_completed}")
+            if self.shared_state.get("hangup_requested") and self.llm_response_completed:
                 logger.warning("CallTerminationProcessor: Bot finished responding to goodbye. Terminating the call via master Task.")
                 task = self.shared_state.get("task")
                 if task:
                     await task.queue_frames([CancelFrame()])
                 else:
-                    await self.push_frame(CancelFrame(), FrameDirection.UPSTREAM)
+                    await self.push_frame(EndTaskFrame(), direction)
                 self.shared_state["hangup_requested"] = False
+                self.llm_response_completed = False

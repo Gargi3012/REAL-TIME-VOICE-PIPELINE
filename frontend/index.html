@@ -86,6 +86,24 @@
                 <p>Please switch TRANSPORT_MODE to "livekit" in your backend to use this frontend.</p>
             </div>
         </div>
+
+        <!-- Auth Overlay -->
+        <div id="auth-overlay" class="auth-overlay hidden">
+            <div class="auth-card">
+                <h2>Admin Login</h2>
+                <p class="auth-subtitle">Verify credentials to unlock controls</p>
+                <div class="auth-input-group">
+                    <label for="auth-username">Username</label>
+                    <input type="text" id="auth-username" placeholder="Enter username" value="admin" />
+                </div>
+                <div class="auth-input-group">
+                    <label for="auth-password">Password</label>
+                    <input type="password" id="auth-password" placeholder="Enter password" />
+                </div>
+                <button id="btn-login" class="btn btn-primary btn-block">Login</button>
+                <p class="auth-toggle">Don't have an account? <a href="#" id="auth-toggle-link">Register</a></p>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notifications -->
