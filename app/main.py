@@ -48,7 +48,7 @@ from app.routers import livekit_router
 from contextlib import asynccontextmanager
 
 APP_STATE = {"is_ready": False}
-ACTIVE_STREAMS = set()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -88,10 +88,31 @@ async def lifespan(app: FastAPI):
     from app.llm.company_faq import refresh_faq_cache
     await refresh_faq_cache()
     
+    async def stale_session_cleanup_task():
+        import asyncio
+        from sqlalchemy import text
+        from app.db.connection import db_manager
+        while APP_STATE.get("is_ready", False):
+            try:
+                async with db_manager.get_session() as db:
+                    # Clean up orphaned Twilio stream claims older than 2 hours
+                    await db.execute(text("DELETE FROM active_streams WHERE started_at < NOW() - INTERVAL '2 hours'"))
+            except Exception as e:
+                logger.error(f"Stale session cleanup task failed: {e}")
+            await asyncio.sleep(600)  # Run every 10 minutes
+
+    # Start cleanup task in the background
+    cleanup_task = asyncio.create_task(stale_session_cleanup_task())
+    
     yield
     
     logger.info("Shutting down database connection pool...")
     APP_STATE["is_ready"] = False
+    
+    # Cancel the cleanup task
+    if 'cleanup_task' in locals():
+        cleanup_task.cancel()
+        
     await db_manager.close()
 
 app = FastAPI(lifespan=lifespan)
@@ -258,11 +279,27 @@ async def websocket_endpoint(websocket: WebSocket):
             if msg.get("event") == "start":
                 stream_sid = msg["start"]["streamSid"]
                 
-                # Prevention of duplicate session creation
-                if stream_sid in ACTIVE_STREAMS:
-                    logger.warning(f"Duplicate WebSocket connection for stream {stream_sid}. Rejecting.")
+                # Prevention of duplicate session creation via Postgres atomic insert
+                from sqlalchemy.exc import IntegrityError
+                from app.db.connection import db_manager
+                from app.db.models import ActiveStream
+                import os
+                
+                try:
+                    async with db_manager.get_session() as db:
+                        worker_id = str(os.getpid())  # Simple worker ID
+                        active_stream = ActiveStream(stream_sid=stream_sid, worker_id=worker_id)
+                        db.add(active_stream)
+                        # We don't strictly need flush here because get_session() yields and then commits, 
+                        # but flushing inside the try-block ensures IntegrityError is caught here instead of in the context manager.
+                        await db.flush()
+                except IntegrityError:
+                    logger.warning(f"[Worker-{os.getpid()}] Duplicate WebSocket connection for stream {stream_sid}. Already claimed by another worker. Rejecting.")
                     return
-                ACTIVE_STREAMS.add(stream_sid)
+                except Exception as e:
+                    logger.error(f"[Worker-{os.getpid()}] Failed to claim stream ownership for {stream_sid}: {e}. Proceeding anyway...")
+                    
+                logger.info(f"[Worker-{os.getpid()}] Successfully claimed ownership of stream {stream_sid}")
                 
                 # Extract custom parameters from the start event
                 custom_params = msg["start"].get("customParameters", {})
@@ -349,9 +386,18 @@ async def websocket_endpoint(websocket: WebSocket):
         except Exception as close_err:
             logger.warning(f"Error while closing Twilio WebSocket: {close_err}")
             
-        # Cleanup of abandoned streams
-        if stream_sid and stream_sid in ACTIVE_STREAMS:
-            ACTIVE_STREAMS.remove(stream_sid)
+        # Cleanup of abandoned streams from distributed store
+        if stream_sid:
+            try:
+                from sqlalchemy import delete
+                from app.db.connection import db_manager
+                from app.db.models import ActiveStream
+                async with db_manager.get_session() as db:
+                    await db.execute(delete(ActiveStream).where(ActiveStream.stream_sid == stream_sid))
+                import os
+                logger.info(f"[Worker-{os.getpid()}] Released distributed ownership for stream {stream_sid}")
+            except Exception as e:
+                logger.error(f"Failed to cleanup active stream {stream_sid} from DB: {e}")
 
 
 # ── Core Pipeline Session ───────────────────────────────────────────────
