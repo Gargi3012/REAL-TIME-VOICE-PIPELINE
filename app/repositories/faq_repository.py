@@ -17,6 +17,20 @@ class FAQRepository:
         return list(result.scalars().all())
 
     @staticmethod
+    async def search_faqs(session: AsyncSession, query: str) -> List[CompanyFAQ]:
+        """Search FAQ entries by matching the query against question or category."""
+        from sqlalchemy import or_
+        stmt = select(CompanyFAQ).where(
+            or_(
+                CompanyFAQ.question.ilike(f"%{query}%"),
+                CompanyFAQ.category.ilike(f"%{query}%"),
+                CompanyFAQ.answer.ilike(f"%{query}%")
+            )
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
     async def get_by_category(session: AsyncSession, category: str) -> List[CompanyFAQ]:
         """Fetch all FAQ entries for a specific category."""
         stmt = select(CompanyFAQ).where(CompanyFAQ.category == category)

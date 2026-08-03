@@ -51,6 +51,14 @@ async def save_lead(params, name: str, phone: str, project_details: str = ""):
                     content = f.read().strip()
                     if content:
                         leads = json.loads(content)
+                        
+            # Prevent duplicate lead creation
+            recent_phones = [lead.get("phone") for lead in leads[-10:]]
+            if phone in recent_phones:
+                logger.info(f"save_lead: Lead with phone {phone} was already saved recently. Skipping duplicate insertion.")
+                if getattr(params, "result_callback", None):
+                    await params.result_callback({"status": "success", "message": "Lead already saved successfully. Do not call save_lead again for this user."})
+                return
             
             leads.append(lead_entry)
             

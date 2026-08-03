@@ -31,14 +31,6 @@ class LanguageRoutingProcessor(FrameProcessor):
             frame.text = re.sub(r'\b0?(\d{1,2}):(\d{2})\b', r'\1\2', frame.text)
             text = frame.text.lower()
             
-            # --- Check for Goodbye phrases ---
-            clean_text = re.sub(r'[^\w\s]', '', text.strip())
-            closing_pattern = r'\b(bye|goodbye|good bye|alvida|end call|end the call|hang up|disconnect|call cut|call end|phone rakh|band kar|bas itna hi|that is all|thats all)\b'
-            
-            if len(clean_text.split()) <= 8 and re.search(closing_pattern, clean_text):
-                logger.info(f"LanguageRoutingProcessor: User said goodbye ('{frame.text}'). Will terminate after bot replies.")
-                self.shared_state["hangup_requested"] = True
-            
             # --- Language Detection ---
             # Check for explicit Devanagari script
             devanagari_count = len(re.findall(r'[\u0900-\u097F]', text))
