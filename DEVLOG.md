@@ -854,3 +854,18 @@ A comprehensive sprint to resolve critical turn-end call teardown bugs, enforce 
   - Implemented `/api/login` and `/api/register` endpoints in `app/routers/livekit_router.py` and enforced `Depends(verify_jwt)` on LiveKit join and Twilio outbound dial routes.
   - Built a glassmorphic dark-theme authentication card overlay on the frontend (`index.html`, `styles.css`, `app.js`) to support secure login and dynamic user sign-up/registration.
 - **Verification**: Updated [test_company_faq.py](file:///d:/REAL-TIME-VOICE-PIPELINE/tests/test_company_faq.py) and [test_pipecat_adapter.py](file:///d:/REAL-TIME-VOICE-PIPELINE/tests/test_pipecat_adapter.py) to support database mock scopes, and added [test_livekit_auth.py](file:///d:/REAL-TIME-VOICE-PIPELINE/tests/test_livekit_auth.py) checking JWT validation. All unit tests successfully compiled and passed.
+
+---
+
+## Milestone — Test Suite Async Migration & Dual-Transport Architecture Patch
+**Date**: 2026-08-04
+**Status**: ✅ Complete — 450/450 Tests Passing
+
+### Overview
+Successfully migrated the entire unit testing suite to native async execution to ensure realistic concurrency, race condition, and event loop behavior testing. Resolved a dual-transport validation bug that caused Twilio calls to crash when the server was globally configured in LiveKit mode.
+
+### Actions Taken
+- **Native Async Test Suite Migration**: Reverted the synchronous monkey-patching in `conftest.py` and refactored all test files (including 4 key test suites) to run under proper async event loops (`async def test_...` with `await` on all session/context manager operations).
+- **Dual-Transport Architecture Fix**: Updated `app/main.py` and `app/main_test.py` to dynamically inspect transport type using `isinstance(transport, LiveKitTransportAdapter)` rather than branching on the global `TRANSPORT_MODE` configuration. This resolves a critical bug where Twilio calls crashed when the backend was configured in LiveKit mode.
+- **Verification**: Ran the full test suite and confirmed that all 450 tests passed successfully with 100% correctness on native async event loops (450/450 tests passed).
+
