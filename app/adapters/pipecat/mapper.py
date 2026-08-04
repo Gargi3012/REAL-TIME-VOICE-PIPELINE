@@ -16,7 +16,7 @@ class PipecatPipelineMapper:
     """Converts our internal Pipeline into a sequence of Pipecat processors."""
     
     @staticmethod
-    def map_pipeline(pipeline: Pipeline) -> List[PipecatProcessorAdapter]:
+    def map_pipeline(pipeline: Pipeline, transport_type: str = "livekit") -> List[PipecatProcessorAdapter]:
         """Convert a DAG pipeline to a linear pipecat sequence.
         
         Pipecat pipelines are typically linear arrays:
@@ -24,7 +24,7 @@ class PipecatPipelineMapper:
         
         We use the PipelineScheduler to get the topological order.
         """
-        logger.debug(f"Converting pipeline {pipeline.pipeline_id} to Pipecat format")
+        logger.debug(f"Converting pipeline {pipeline.pipeline_id} to Pipecat format with transport_type={transport_type}")
         
         try:
             scheduler = PipelineScheduler(pipeline)
@@ -38,7 +38,7 @@ class PipecatPipelineMapper:
                     raise ProcessorMappingError(f"Processor {processor_id} not found in pipeline")
                     
                 # Create the actual pipecat instance
-                raw_processor = create_pipecat_processor(node.role, node.metadata)
+                raw_processor = create_pipecat_processor(node.role, node.metadata, transport_type=transport_type)
                 adapter = PipecatProcessorAdapter(node.processor_id, raw_processor)
                 pipecat_processors.append(adapter)
                 

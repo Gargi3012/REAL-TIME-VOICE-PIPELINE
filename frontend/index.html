@@ -15,8 +15,12 @@
                 <img src="logo.jpg" alt="Cybernauts Logo" class="logo-icon" />
                 <h1>Cybernauts</h1>
             </div>
-            <div id="transport-mode-indicator" class="transport-indicator">
-                Checking mode...
+            <div class="mode-selector-container">
+                <select id="calling-mode-select" class="mode-select">
+                    <option value="webrtc">Browser (WebRTC) Mode</option>
+                    <option value="twilio_outbound">SIM-Based Calling (Twilio)</option>
+                </select>
+                <span id="transport-mode-indicator" class="transport-indicator hidden">Checking mode...</span>
             </div>
         </header>
 
@@ -30,6 +34,10 @@
                 </div>
                 <div class="connection-actions">
                     <button id="btn-join" class="btn btn-primary">Join Call</button>
+                    <div id="phone-input-container" class="phone-call-container hidden">
+                        <input type="tel" id="phone-input" placeholder="+91 XXXXX XXXXX" class="phone-input" />
+                        <button id="btn-call-phone" class="btn btn-phone">Join Call</button>
+                    </div>
                     <button id="btn-leave" class="btn btn-secondary" disabled>Leave Call</button>
                 </div>
             </section>
@@ -76,6 +84,24 @@
                 <h2>Twilio Mode Active</h2>
                 <p>System is in Twilio mode. Browser testing is not available.</p>
                 <p>Please switch TRANSPORT_MODE to "livekit" in your backend to use this frontend.</p>
+            </div>
+        </div>
+
+        <!-- Auth Overlay -->
+        <div id="auth-overlay" class="auth-overlay hidden">
+            <div class="auth-card">
+                <h2>Admin Login</h2>
+                <p class="auth-subtitle">Verify credentials to unlock controls</p>
+                <div class="auth-input-group">
+                    <label for="auth-username">Username</label>
+                    <input type="text" id="auth-username" placeholder="Enter username" value="admin" />
+                </div>
+                <div class="auth-input-group">
+                    <label for="auth-password">Password</label>
+                    <input type="password" id="auth-password" placeholder="Enter password" />
+                </div>
+                <button id="btn-login" class="btn btn-primary btn-block">Login</button>
+                <p class="auth-toggle">Don't have an account? <a href="#" id="auth-toggle-link">Register</a></p>
             </div>
         </div>
     </div>

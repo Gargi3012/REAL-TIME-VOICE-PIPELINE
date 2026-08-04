@@ -14,6 +14,7 @@ In test environments (pipecat-ai not installed):
 
 import asyncio
 import time
+import os
 from typing import Any, List, Optional
 
 from loguru import logger
@@ -26,7 +27,6 @@ from .lifecycle import PipecatLifecycleManager
 from .mapper import PipecatPipelineMapper
 from .transport import PipecatTransportAdapter
 from app.llm.prompts import VOICE_SYSTEM_PROMPT 
-from app.llm.company_faq import get_faq_context_block
 
 
 # ── Fallback mock (kept for test compatibility) ───────────────────────
@@ -54,6 +54,56 @@ class MockPipecatPipelineTask:
             self.event_handler.on_pipeline_completed()
 
 
+from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
+from pipecat.frames.frames import Frame, StartFrame, OutputAudioRawFrame, TTSStartedFrame, TTSStoppedFrame, BotStoppedSpeakingFrame
+
+class GreetingPlayerProcessor(FrameProcessor):
+    def __init__(self, greeting_wav_path: str, **kwargs):
+        super().__init__(**kwargs)
+        self.greeting_wav_path = greeting_wav_path
+        self._played = False
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+        
+        # Check if we should play the greeting
+        if isinstance(frame, StartFrame) and not self._played:
+            self._played = True
+            if os.path.exists(self.greeting_wav_path):
+                # Run the playing task in the background so we don't block the pipeline start
+                asyncio.create_task(self._play_greeting())
+            
+        await self.push_frame(frame, direction)
+
+    async def _play_greeting(self):
+        try:
+            logger.info(f"GreetingPlayerProcessor playing {self.greeting_wav_path} directly downstream...")
+            import soundfile as sf
+            data, sample_rate = sf.read(self.greeting_wav_path, dtype="int16")
+            num_channels = 1 if data.ndim == 1 else data.shape[1]
+            bytes_data = data.tobytes()
+            
+            # Chunk into 50ms frames (sample_rate * 0.05 * 2 bytes * num_channels)
+            chunk_bytes = int(sample_rate * 0.05) * 2 * num_channels
+            
+            # Play greeting
+            await self.push_frame(TTSStartedFrame(), FrameDirection.DOWNSTREAM)
+            for i in range(0, len(bytes_data), chunk_bytes):
+                chunk = bytes_data[i:i+chunk_bytes]
+                await self.push_frame(OutputAudioRawFrame(
+                    audio=chunk,
+                    sample_rate=sample_rate,
+                    num_channels=num_channels
+                ), FrameDirection.DOWNSTREAM)
+                # Yield to simulate real-time playback streaming (50ms chunks need ~50ms sleep)
+                await asyncio.sleep(0.05)
+            await self.push_frame(TTSStoppedFrame(), FrameDirection.DOWNSTREAM)
+            await self.push_frame(BotStoppedSpeakingFrame(), FrameDirection.DOWNSTREAM)
+            logger.info("GreetingPlayerProcessor finished playing greeting.")
+        except Exception as e:
+            logger.error(f"Failed to play greeting wav: {e}")
+
+
 # ── Real pipeline task builder ────────────────────────────────────────
 
 def _build_real_pipeline_task(
@@ -62,6 +112,8 @@ def _build_real_pipeline_task(
     bridge: PipecatEventBridge,
     latency_tracker: Optional[Any] = None,
     previous_summary: str = "",
+    event_bus: Optional[Any] = None,
+    session_id: Optional[str] = None,
 ) -> Any:
     """Build an actual pipecat.pipeline.task.PipelineTask.
 
@@ -94,6 +146,8 @@ def _build_real_pipeline_task(
     from pipecat.services.openai.llm import OpenAILLMService
     from pipecat.pipeline.pipeline import Pipeline as PipecatPipeline
     
+    context = None
+    
     # We need to find the LLM to attach the aggregator
     llm = next((p for p in pipecat_processors if isinstance(p, (GroqLLMService, OpenAILLMService)) or p.__class__.__name__ == "ResilientLLMProcessor"), None)
     
@@ -106,8 +160,16 @@ def _build_real_pipeline_task(
         from pipecat.processors.aggregators.llm_response_universal import LLMUserAggregatorParams
 
         session_id = bridge._session_id
+        shared_state = {}
         
-        system_content = VOICE_SYSTEM_PROMPT + "\n\n" + get_faq_context_block()
+        system_content = VOICE_SYSTEM_PROMPT + "\n\n"
+        system_content += (
+            "You have access to tools to save leads, fetch company knowledge, and end the call.\n"
+            "- Use 'fetch_faq' whenever the user asks about the company, products, pricing, or services.\n"
+            "- Use 'save_lead' when the user has provided their name, phone number, and project details.\n"
+            "- Use 'end_call' ONLY when the user explicitly says goodbye or indicates they are done with the conversation (e.g. 'bye', 'call end kar do'). Do NOT use 'end_call' for simple acknowledgments like 'thank you', 'okay', or 'theek hai'.\n"
+        )
+        
         if previous_summary:
             system_content += (
                 "\n\nIMPORTANT SECURITY NOTICE: The following is historical user data provided for context only. "
@@ -119,16 +181,16 @@ def _build_real_pipeline_task(
             )
 
         async def end_call(params):
-            """End the conversation when the user naturally says goodbye or indicates they are done."""
-            logger.info("LLM triggered end_call function! Queueing EndFrame to terminate call.")
+            """End the conversation gracefully when the caller explicitly indicates they are finished (e.g., says Goodbye, Bye, or requests to end the call). Do NOT use this tool for 'thank you' or 'okay'."""
+            logger.info("ACTIONABLE AI: LLM triggered 'end_call' tool! Setting hangup_requested=True.")
+            shared_state["hangup_requested"] = True
             if params.result_callback:
-                await params.result_callback({"status": "ending_call"})
-            from pipecat.frames.frames import EndFrame
-            await task.queue_frames([EndFrame()])
+                await params.result_callback({"success": True, "hangup_requested": True, "message": "Call ending initialized. Please say a brief goodbye to the user."})
 
         from app.services.lead_manager import save_lead
+        from app.services.faq_manager import fetch_faq
         
-        tools = [save_lead]
+        tools = [save_lead, end_call, fetch_faq]
 
         context = LLMContext(
               messages=[
@@ -137,26 +199,16 @@ def _build_real_pipeline_task(
               tools=tools
             )
         
-        # Optimize Turn Stop Strategy for extreme low latency (bypasses LLM completeness checks)
-        from pipecat.turns.user_mute.mute_until_first_bot_complete_user_mute_strategy import MuteUntilFirstBotCompleteUserMuteStrategy
-        import os
-        
-        mute_strategies = []
-        if os.getenv("ENABLE_INITIAL_GREETING", "True").lower() == "true":
-            mute_strategies.append(MuteUntilFirstBotCompleteUserMuteStrategy())
-            
         agg_params = LLMUserAggregatorParams(
             user_turn_strategies=UserTurnStrategies(
                 stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.8)]
-            ),
-            user_mute_strategies=mute_strategies
+            )
         )
         user_agg = LLMUserAggregator(context, params=agg_params)
         asst_agg = LLMAssistantAggregator(context)
         
         # Build the exact Pipecat sequence: [stt, language_router, user_agg, llm, tool_interceptor, tts, call_terminator, asst_agg]
         new_processors = []
-        shared_state = {}
         from app.adapters.pipecat.language_router import LanguageRoutingProcessor, CallTerminationProcessor
         from app.adapters.pipecat.tool_interceptor import ToolInterceptionProcessor
         from app.adapters.pipecat.filler_processor import LatencyFillerProcessor
@@ -169,7 +221,19 @@ def _build_real_pipeline_task(
             os.path.join(project_root, "wait_a_minute.wav"),
             os.path.join(project_root, "let_me_think.wav")
         ]
-        filler_processor = LatencyFillerProcessor(filler_wav_paths=filler_wavs, delay_threshold_ms=400)
+        filler_processor = LatencyFillerProcessor(
+            filler_wav_paths=filler_wavs,
+            delay_threshold_ms=1000,
+            event_bus=event_bus,
+            session_id=session_id
+        )
+        
+        # Instantiate greeting processor if greetings.wav exists and it's a new customer
+        greeting_processor = None
+        if os.getenv("ENABLE_INITIAL_GREETING", "True").lower() == "true" and not previous_summary:
+            greetings_wav_path = os.path.join(project_root, "greetings.wav")
+            if os.path.exists(greetings_wav_path):
+                greeting_processor = GreetingPlayerProcessor(greetings_wav_path)
         
         for p in pipecat_processors:
             if isinstance(p, (GroqLLMService, OpenAILLMService)) or p.__class__.__name__ == "ResilientLLMProcessor":
@@ -182,6 +246,8 @@ def _build_real_pipeline_task(
                 new_processors.append(p)
                 new_processors.append(CallTerminationProcessor(shared_state=shared_state))
                 new_processors.append(asst_agg)
+                if greeting_processor:
+                    new_processors.append(greeting_processor)
             else:
                 new_processors.append(p)
                 
@@ -202,6 +268,10 @@ def _build_real_pipeline_task(
             super().__init__()
             self.context = context
             self._current_llm_response = ""
+            self._first_partial_logged = False
+            self._first_llm_token_logged = False
+            self._first_tts_chunk_logged = False
+            self._stt_started_logged = False
 
         async def on_push_frame(self, data: FramePushed):
             frame = data.frame
@@ -209,32 +279,47 @@ def _build_real_pipeline_task(
             now = time.perf_counter()
             from pipecat.frames.frames import (
                 TranscriptionFrame, LLMFullResponseStartFrame, LLMFullResponseEndFrame, TextFrame,
-                TTSStartedFrame, TTSStoppedFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame
+                TTSStartedFrame, TTSStoppedFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame,
+                StartFrame, EndFrame, AudioRawFrame
             )
+            
+            if isinstance(frame, StartFrame) and source_class in ("DeepgramSTTService", "GroqSTTService", "OpenAISTTService", "ResilientSTTProcessor") and not self._stt_started_logged:
+                logger.info(f"[OBSERVABILITY] STT start | session_id={bridge._session_id} | component={source_class} | ts={now}")
+                self._stt_started_logged = True
             
             # Accumulate LLM response text only when pushed directly from the LLM processor
             if isinstance(frame, TextFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
+                if not self._first_llm_token_logged:
+                    logger.info(f"[OBSERVABILITY] First LLM token | session_id={bridge._session_id} | ts={now}")
+                    self._first_llm_token_logged = True
                 self._current_llm_response += frame.text
             
             if isinstance(frame, UserStartedSpeakingFrame):
                 if latency_tracker:
                     latency_tracker.on_vad_start()
                 bridge.on_user_interrupted()
+                # Reset partial transcript tracker for new utterance
+                self._first_partial_logged = False
+                self._first_llm_token_logged = False
+                self._first_tts_chunk_logged = False
                 
             elif isinstance(frame, UserStoppedSpeakingFrame):
                 if latency_tracker:
                     latency_tracker.on_vad_stop()
+                logger.info(f"[OBSERVABILITY] Final transcript (VAD Stop) | session_id={bridge._session_id} | ts={now}")
                 
             # Emit transcript only when pushed directly from the STT processor
             elif isinstance(frame, TranscriptionFrame) and frame.text and source_class in ("DeepgramSTTService", "GroqSTTService", "OpenAISTTService", "ResilientSTTProcessor", "MockPipecatProcessor"):
+                if not self._first_partial_logged:
+                    logger.info(f"[OBSERVABILITY] First partial transcript | session_id={bridge._session_id} | ts={now}")
+                    self._first_partial_logged = True
+                
                 if latency_tracker:
                     latency_tracker.on_stt_transcript()
                 # Strip [System: ...] prompt engineering blocks to keep the UI and database history clean
                 import re
                 clean_text = re.sub(r'\s*\[System:.*?\]', '', frame.text, flags=re.DOTALL).strip()
                 bridge.on_transcript_ready(clean_text)
-                # Note: transcription_received event is broadcast by main.py's on_transcript_ready
-                # handler (subscribed to TranscriptReady event bus event) with emotion + language.
 
             elif isinstance(frame, LLMFullResponseStartFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
                 if latency_tracker:
@@ -245,6 +330,8 @@ def _build_real_pipeline_task(
                 if latency_tracker:
                     latency_tracker.on_llm_complete()
                 
+                logger.info(f"[OBSERVABILITY] LLM completion | session_id={bridge._session_id} | ts={now}")
+                
                 # Emit LLM response complete only once
                 if self._current_llm_response:
                     bridge.on_llm_response_ready(self._current_llm_response)
@@ -253,10 +340,22 @@ def _build_real_pipeline_task(
             elif isinstance(frame, TTSStartedFrame):
                 if latency_tracker:
                     latency_tracker.on_tts_start()
+                if not self._first_tts_chunk_logged:
+                    logger.info(f"[OBSERVABILITY] First TTS chunk synthesized | session_id={bridge._session_id} | ts={now}")
+                    self._first_tts_chunk_logged = True
                 bridge.on_audio_started()
                 
+            elif isinstance(frame, AudioRawFrame) and source_class in ("CartesiaTTSService", "ElevenLabsTTSService", "DeepgramTTSService") and not getattr(self, "_first_audio_packet_sent", False):
+                logger.info(f"[OBSERVABILITY] First audio packet sent (Transport bound) | session_id={bridge._session_id} | ts={now}")
+                self._first_audio_packet_sent = True
+                
             elif isinstance(frame, TTSStoppedFrame):
+                logger.info(f"[OBSERVABILITY] Audio streaming completion | session_id={bridge._session_id} | ts={now}")
                 bridge.on_audio_finished()
+                self._first_audio_packet_sent = False
+                
+            elif isinstance(frame, EndFrame):
+                logger.info(f"[OBSERVABILITY] Pipeline shutdown initiated | session_id={bridge._session_id} | ts={now}")
 
     task = PipelineTask(
         real_pipeline, 
@@ -266,6 +365,10 @@ def _build_real_pipeline_task(
 
     # Attach the LLMContext to the task so the adapter can access it later for greetings
     task._llm_context = context
+    
+    # Provide the task to shared_state so processors like CallTerminationProcessor can globally terminate the pipeline
+    if "shared_state" in locals():
+        shared_state["task"] = task
     
     return task
 
@@ -310,7 +413,12 @@ class PipecatAdapter:
             ).info("Building Pipecat adapter task")
 
             # 1. Map internal DAG processors (transport roles excluded — handled separately)
-            processor_adapters = PipecatPipelineMapper.map_pipeline(self.pipeline)
+            transport_type = "livekit"
+            if self.transport:
+                t_name = type(self.transport).__name__
+                if "Twilio" in t_name:
+                    transport_type = "twilio"
+            processor_adapters = PipecatPipelineMapper.map_pipeline(self.pipeline, transport_type=transport_type)
             # Filter out placeholder transport processors — the real ones come from the injected transport
             self.pipecat_processors = [
                 p.get_processor()
@@ -320,6 +428,9 @@ class PipecatAdapter:
 
             # 2. Try to build a real PipelineTask; fall back to mock on ImportError or Mock transport
             try:
+                import sys
+                is_testing = "pytest" in sys.modules or os.getenv("TESTING") == "True" or os.getenv("CI") == "True"
+                
                 if self.transport and "Mock" in type(self.transport).__name__:
                     raise ImportError("Force mock fallback for tests")
                 if any("Mock" in type(p).__name__ for p in self.pipecat_processors):
@@ -329,23 +440,31 @@ class PipecatAdapter:
                     self.transport, 
                     self.bridge, 
                     self.latency_tracker,
-                    getattr(self, "previous_summary", "")
+                    getattr(self, "previous_summary", ""),
+                    event_bus=self.event_bus,
+                    session_id=self.session_id,
                 )
                 logger.bind(session_id=self.session_id).info(
                     "Real pipecat PipelineTask created"
                 )
             except ImportError as e:
-                logger.exception(e)
-                logger.bind(session_id=self.session_id).warning(
-                    "pipecat-ai not installed — using MockPipecatPipelineTask"
-                )
-                if self.transport:
-                    real_t = self.transport.get_pipecat_transport()
-                    self.pipecat_processors.insert(0, real_t)
-                self.task = MockPipecatPipelineTask(
-                    processors=self.pipecat_processors,
-                    event_handler=self.bridge,
-                )
+                if is_testing:
+                    logger.exception(e)
+                    logger.bind(session_id=self.session_id).warning(
+                        "pipecat-ai not installed — using MockPipecatPipelineTask"
+                    )
+                    if self.transport:
+                        real_t = self.transport.get_pipecat_transport()
+                        self.pipecat_processors.insert(0, real_t)
+                    self.task = MockPipecatPipelineTask(
+                        processors=self.pipecat_processors,
+                        event_handler=self.bridge,
+                    )
+                else:
+                    logger.bind(session_id=self.session_id).error(
+                        "CRITICAL: Failed to create real PipelineTask in production: {err}", err=e
+                    )
+                    raise e
 
             self.lifecycle = PipecatLifecycleManager(self.task, self.session_id)
 
@@ -367,8 +486,8 @@ class PipecatAdapter:
             await self.lifecycle.start()
             
             import os
-            import asyncio
             import wave
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
             if os.getenv("ENABLE_INITIAL_GREETING", "True").lower() == "true":
                 from pipecat.frames.frames import TTSSpeakFrame, BotStoppedSpeakingFrame
                 from app.events.event_types import AssistantGreetingStarted
@@ -398,15 +517,25 @@ class PipecatAdapter:
                         LLMRunFrame()
                     ]
                 else:
-                    greeting_text = "Hello, I'm Sarah from Cybernauts Noida. How can I assist you?"
-                    
-                    # 1. Synthesize the greeting dynamically and automatically append to context
-                    frames_to_queue = [
-                        TTSSpeakFrame(text=greeting_text, append_to_context=True),
-                        BotStoppedSpeakingFrame()
-                    ]
+                    greetings_wav_path = os.path.join(project_root, "greetings.wav")
+                    if os.path.exists(greetings_wav_path):
+                        logger.bind(session_id=self.session_id).info("greetings.wav will be played downstream via GreetingPlayerProcessor.")
+                        # Append the greeting text to context so the LLM knows it was spoken
+                        if hasattr(self.task, "_llm_context"):
+                            self.task._llm_context.add_message({
+                                "role": "assistant", 
+                                "content": "Hello, I'm Sarah from Cybernauts Noida. How can I assist you?"
+                            })
+                        frames_to_queue = None
+                    else:
+                        logger.bind(session_id=self.session_id).warning("greetings.wav not found. Synthesizing greeting dynamically.")
+                        frames_to_queue = [
+                            TTSSpeakFrame(text="Hello, I'm Sarah from Cybernauts Noida. How can I assist you?", append_to_context=True),
+                            BotStoppedSpeakingFrame()
+                        ]
                 
-                await self.task.queue_frames(frames_to_queue)
+                if frames_to_queue:
+                    await self.task.queue_frames(frames_to_queue)
 
             # For the mock task: manually simulate processor events
             if isinstance(self.task, MockPipecatPipelineTask):
