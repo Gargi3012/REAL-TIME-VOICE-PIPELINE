@@ -17,6 +17,7 @@ import sys
 import os
 import ssl
 import certifi
+from xml.sax.saxutils import escape as xml_escape
 
 os.environ["SSL_CERT_FILE"] = certifi.where()
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -197,6 +198,8 @@ async def handle_inbound_call(request: Request):
     except Exception as e:
         logger.error(f"Failed DB pre-fetch: {e}")
 
+    previous_summary_escaped = xml_escape(previous_summary)
+
     # Resolve the host for the websocket stream
     import os
     public_url = os.getenv("PUBLIC_BASE_URL", "")
@@ -214,6 +217,7 @@ async def handle_inbound_call(request: Request):
             <Parameter name="phone" value="{phone_number}" />
             <Parameter name="client_id" value="{client_id_str}" />
             <Parameter name="webhook_processing_start" value="{webhook_processing_start}" />
+            <Parameter name="previous_summary" value="{previous_summary_escaped}" />
         </Stream>
     </Connect>
 </Response>
@@ -237,36 +241,38 @@ async def websocket_endpoint(websocket: WebSocket):
     stream_sid = None
     # Wait for the start event
     for _ in range(5): # Don't loop forever
-            data = await websocket.receive_text()
-            msg = json.loads(data)
-            if msg.get("event") == "start":
-                stream_sid = msg["start"]["streamSid"]
-                
-                # Prevention of duplicate session creation
-                if stream_sid in ACTIVE_STREAMS:
-                    logger.warning(f"Duplicate WebSocket connection for stream {stream_sid}. Rejecting.")
-                    return
-                ACTIVE_STREAMS.add(stream_sid)
-                
-             # Extract custom parameters from the start event
-                custom_params = msg["start"].get("customParameters", {})
-                phone_number = custom_params.get("phone", "unknown_client")
-                client_id_str = custom_params.get("client_id", "")
-                company_context = custom_params.get("company_context", "")
-                webhook_processing_start = float(custom_params.get("webhook_processing_start", 0.0))
-                
-                first_audio_packet = time.perf_counter()
-                connection_metrics = {
-                    "webhook_processing_start": webhook_processing_start,
-                    "media_stream_connection": media_stream_connection,
-                    "first_audio_packet": first_audio_packet,
-                }
-                masked_phone = f"{phone_number[:3]}******{phone_number[-4:]}" if len(phone_number) > 7 and phone_number != "unknown_client" else phone_number
-                logger.info(f"Twilio stream started: {stream_sid} | phone: {masked_phone} | client_id: {client_id_str}")
-                break
-            elif msg.get("event") == "connected":
-                logger.info("Twilio connected event received")
-                continue
+        data = await websocket.receive_text()
+        msg = json.loads(data)
+        if msg.get("event") == "start":
+            stream_sid = msg["start"]["streamSid"]
+
+            # Prevention of duplicate session creation
+            if stream_sid in ACTIVE_STREAMS:
+                logger.warning(f"Duplicate WebSocket connection for stream {stream_sid}. Rejecting.")
+                return
+            ACTIVE_STREAMS.add(stream_sid)
+
+            # Extract custom parameters from the start event
+            custom_params = msg["start"].get("customParameters", {})
+            phone_number = custom_params.get("phone", "unknown_client")
+            client_id_str = custom_params.get("client_id", "")
+            company_context = custom_params.get("company_context", "")
+            webhook_processing_start = float(custom_params.get("webhook_processing_start", 0.0))
+            previous_summary = custom_params.get("previous_summary", "")
+
+            first_audio_packet = time.perf_counter()
+            connection_metrics = {
+                "webhook_processing_start": webhook_processing_start,
+                "media_stream_connection": media_stream_connection,
+                "first_audio_packet": first_audio_packet,
+            }
+            masked_phone = f"{phone_number[:3]}******{phone_number[-4:]}" if len(phone_number) > 7 and phone_number != "unknown_client" else phone_number
+            logger.info(f"Twilio stream started: {stream_sid} | phone: {masked_phone} | client_id: {client_id_str}")
+            break
+        elif msg.get("event") == "connected":
+            logger.info("Twilio connected event received")
+            continue
+
             
     if not stream_sid:
         logger.error("Did not receive 'start' event from Twilio")
@@ -274,28 +280,6 @@ async def websocket_endpoint(websocket: WebSocket):
         return
     
     transport = TwilioTransportAdapter(websocket=websocket, stream_sid=stream_sid)
-    
-    # ── Database Pre-fetch (Moved from handle_inbound_call) ──
-    previous_summary = ""
-    if client_id_str:
-        try:
-            from app.db.connection import db_manager
-            from app.repositories.session_repository import SessionRepository
-            import uuid
-            
-            async def fetch_db_ws():
-                async with db_manager.get_session() as db:
-                    client_uuid = uuid.UUID(client_id_str)
-                    return await SessionRepository.get_summary(db, client_uuid)
-                    
-            summary_text = await asyncio.wait_for(fetch_db_ws(), timeout=3.0)
-            if summary_text:
-                logger.info(f"Retrieved DB summary for {client_id_str}: {summary_text[:50]}...")
-                previous_summary = summary_text
-        except asyncio.TimeoutError:
-            logger.error("DB pre-fetch timed out after 3s in websocket. Proceeding without context.")
-        except Exception as e:
-            logger.error(f"Failed to fetch summary in websocket: {e}")
     
     # Block and run the voice session on this websocket
     try:
@@ -708,8 +692,7 @@ def main() -> None:
     import uvicorn
     logger.info(f"TRANSPORT_MODE is set to '{TRANSPORT_MODE}'. Starting FastAPI server on port 8000...")
     # Always run the FastAPI server so the frontend can hit /api/livekit/join and /ws/frontend
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
-
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True, reload_dirs=["app"])
 
 if __name__ == "__main__":
     main()

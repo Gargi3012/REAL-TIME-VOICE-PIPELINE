@@ -797,3 +797,26 @@ Standardized the audio pipeline so that both Twilio (telephony) and LiveKit (Web
 - **Transport Alignment**: Automatically enforces `16000Hz` when `TRANSPORT_MODE=livekit` to support wideband WebRTC audio, and `8000Hz` when `TRANSPORT_MODE=twilio` to align with the `TwilioFrameSerializer` and PSTN telephony limitations.
 - **Perfect Multi-Language Support on Twilio**: Verified that the English, Hindi, and Hinglish STT/TTS routing perfectly inherits these dynamically adjusted audio constraints, meaning all features work natively across both transports seamlessly.
 
+  ---
+## Milestone — Pillar 3: FAQ Knowledge Base Migrated from JSON to Database
+**Date**: 2026-07-22
+**Status**: ✅ Complete — Implemented and Tested
+
+### Overview
+Migrated the company FAQ knowledge base from a static JSON file (`app/llm/knowledge_base.json`) to a proper PostgreSQL table (`company_faqs`), to make FAQ content easier to manage at scale and reduce risk of unbounded prompt/token growth as the FAQ list expands.
+
+### What was built
+- Added a `CompanyFAQ` SQLAlchemy model (id, category, question, answer) and generated an Alembic migration to create the `company_faqs` table.
+- Added `FAQRepository` for standard CRUD operations against the new table.
+- Added a one-time seed script (`scripts/seed_faqs.py`) that migrated all 14 existing FAQ entries from the JSON file into the database, and is idempotent (safe to re-run — clears and re-inserts).
+- Rewrote `app/llm/company_faq.py`: FAQs are now loaded from the database into an in-memory cache once at application startup (`refresh_faq_cache()`, wired to a FastAPI `@app.on_event("startup")` handler), so the hot call path (`get_faq_context_block()`) stays synchronous and fast — no DB query per call, no latency regression on live calls.
+- Removed `app/llm/knowledge_base.json`, since it's no longer read anywhere.
+
+### Verification
+- Confirmed all 14 FAQ entries present in the `company_faqs` table via direct SQL query in Neon.
+- Confirmed cache loads correctly on server startup via logs: `FAQ cache refreshed from database | entries=14`.
+- Confirmed no change to the live prompt-building path or call latency, since `get_faq_context_block()`'s signature and behavior are unchanged from the caller's perspective — only the underlying data source changed.
+
+### Conclusion
+The Company FAQ feature is now database-backed rather than file-backed, making it straightforward to add, edit, or manage FAQ entries going forward (e.g. via an admin script or future interface) without requiring a code deploy.
+
