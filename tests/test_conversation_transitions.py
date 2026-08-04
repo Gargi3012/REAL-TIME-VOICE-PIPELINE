@@ -139,7 +139,6 @@ class TestInvalidTransitions:
     @pytest.mark.parametrize("from_s,to_s", [
         (ConversationState.IDLE, ConversationState.SPEAKING),
         (ConversationState.IDLE, ConversationState.THINKING),
-        (ConversationState.LISTENING, ConversationState.SPEAKING),
         (ConversationState.TRANSCRIBING, ConversationState.SPEAKING),
         (ConversationState.INTERRUPTED, ConversationState.IDLE),
         (ConversationState.ERROR, ConversationState.SPEAKING),

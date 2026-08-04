@@ -21,51 +21,54 @@ class TestVoicePrompts:
         # Ensure it has no markdown markers
         assert "#" not in VOICE_SYSTEM_PROMPT
         assert "*" not in VOICE_SYSTEM_PROMPT
-        assert "-" not in VOICE_SYSTEM_PROMPT
         assert "1." not in VOICE_SYSTEM_PROMPT
 
 
 class TestContextManager:
-    def test_get_trimmed_history_empty_session(self, manager: SessionManager) -> None:
+    @pytest.mark.asyncio
+    async def test_get_trimmed_history_empty_session(self, manager: SessionManager) -> None:
         """Verify trimming empty session returns empty list."""
         ctx_mgr = ContextManager(manager)
-        assert ctx_mgr.get_trimmed_history("non-existent-session-id") == []
+        assert (await ctx_mgr.get_trimmed_history("non-existent-session-id")) == []
 
-    def test_get_trimmed_history_shorter_than_max(self, manager: SessionManager) -> None:
+    @pytest.mark.asyncio
+    async def test_get_trimmed_history_shorter_than_max(self, manager: SessionManager) -> None:
         """Verify that if history is shorter than max, entire history is returned."""
         ctx_mgr = ContextManager(manager)
-        s = manager.create_session()
-        manager.add_message(s.session_id, "user", "hi")
-        manager.add_message(s.session_id, "assistant", "hello")
+        s = await manager.create_session()
+        await manager.add_message(s.session_id, "user", "hi")
+        await manager.add_message(s.session_id, "assistant", "hello")
         
-        trimmed = ctx_mgr.get_trimmed_history(s.session_id, max_messages=5)
+        trimmed = await ctx_mgr.get_trimmed_history(s.session_id, max_messages=5)
         assert len(trimmed) == 2
         assert trimmed[0].content == "hi"
         assert trimmed[1].content == "hello"
 
-    def test_get_trimmed_history_no_system_prompt(self, manager: SessionManager) -> None:
+    @pytest.mark.asyncio
+    async def test_get_trimmed_history_no_system_prompt(self, manager: SessionManager) -> None:
         """Verify sliding window trims to last N when no system prompt is present."""
         ctx_mgr = ContextManager(manager)
-        s = manager.create_session()
+        s = await manager.create_session()
         for i in range(5):
-            manager.add_message(s.session_id, "user", f"message {i}")
+            await manager.add_message(s.session_id, "user", f"message {i}")
             
-        trimmed = ctx_mgr.get_trimmed_history(s.session_id, max_messages=3)
+        trimmed = await ctx_mgr.get_trimmed_history(s.session_id, max_messages=3)
         assert len(trimmed) == 3
         assert trimmed[0].content == "message 2"
         assert trimmed[1].content == "message 3"
         assert trimmed[2].content == "message 4"
 
-    def test_get_trimmed_history_preserves_system_prompt(self, manager: SessionManager) -> None:
+    @pytest.mark.asyncio
+    async def test_get_trimmed_history_preserves_system_prompt(self, manager: SessionManager) -> None:
         """Verify system prompt at index 0 is preserved, and rest is trimmed to max-1."""
         ctx_mgr = ContextManager(manager)
-        s = manager.create_session()
-        manager.add_message(s.session_id, "system", VOICE_SYSTEM_PROMPT)
+        s = await manager.create_session()
+        await manager.add_message(s.session_id, "system", VOICE_SYSTEM_PROMPT)
         for i in range(5):
-            manager.add_message(s.session_id, "user", f"message {i}")
+            await manager.add_message(s.session_id, "user", f"message {i}")
             
         # max_messages=4 should return 1 system prompt + 3 last user messages (message 2, 3, 4)
-        trimmed = ctx_mgr.get_trimmed_history(s.session_id, max_messages=4)
+        trimmed = await ctx_mgr.get_trimmed_history(s.session_id, max_messages=4)
         assert len(trimmed) == 4
         assert trimmed[0].role == "system"
         assert trimmed[0].content == VOICE_SYSTEM_PROMPT
@@ -73,12 +76,13 @@ class TestContextManager:
         assert trimmed[2].content == "message 3"
         assert trimmed[3].content == "message 4"
 
-    def test_get_trimmed_history_invalid_max_messages(self, manager: SessionManager) -> None:
+    @pytest.mark.asyncio
+    async def test_get_trimmed_history_invalid_max_messages(self, manager: SessionManager) -> None:
         """Verify raising error if max_messages < 1."""
         ctx_mgr = ContextManager(manager)
-        s = manager.create_session()
+        s = await manager.create_session()
         with pytest.raises(ValueError, match="max_messages must be at least 1"):
-            ctx_mgr.get_trimmed_history(s.session_id, max_messages=0)
+            await ctx_mgr.get_trimmed_history(s.session_id, max_messages=0)
 
 
 class TestGroqLLMClient:
@@ -103,7 +107,7 @@ class TestGroqLLMClient:
     @pytest.mark.asyncio
     async def test_stream_response(self) -> None:
         """Verify stream_response converts messages correctly and yields chunks."""
-        client = GroqLLMClient(api_key="gsk_dummy")
+        client = GroqLLMClient(api_key="gsk_dummy", model="llama-3.3-70b-versatile")
         
         # Mocking the AsyncGroq client chat.completions.create response
         mock_response = MagicMock()

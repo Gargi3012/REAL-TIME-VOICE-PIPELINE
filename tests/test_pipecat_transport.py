@@ -38,7 +38,7 @@ def test_livekit_transport_missing_url():
     sys.modules['pipecat.audio.vad.vad_analyzer'] = MagicMock()
     
     with pytest.raises(ValueError, match="LIVEKIT_URL is not set"):
-        LiveKitTransportAdapter(room_url=None)
+        LiveKitTransportAdapter(room_url=None, bot_name="bot")
 
     
     # cleanup
