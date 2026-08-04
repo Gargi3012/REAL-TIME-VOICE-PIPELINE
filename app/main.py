@@ -17,6 +17,7 @@ import sys
 import os
 import ssl
 import certifi
+from xml.sax.saxutils import escape as xml_escape
 
 os.environ["SSL_CERT_FILE"] = certifi.where()
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -247,6 +248,8 @@ async def handle_inbound_call(request: Request):
     except Exception as e:
         logger.error(f"Failed DB pre-fetch: {e}")
 
+    previous_summary_escaped = xml_escape(previous_summary)
+
     # Resolve the host for the websocket stream
     import os
     public_url = os.getenv("PUBLIC_BASE_URL", "")
@@ -264,6 +267,7 @@ async def handle_inbound_call(request: Request):
             <Parameter name="phone" value="{phone_number}" />
             <Parameter name="client_id" value="{client_id_str}" />
             <Parameter name="webhook_processing_start" value="{webhook_processing_start}" />
+            <Parameter name="previous_summary" value="{previous_summary_escaped}" />
         </Stream>
     </Connect>
 </Response>
@@ -283,9 +287,8 @@ async def websocket_endpoint(websocket: WebSocket):
         return
     
     # Twilio sends a 'connected' event, then a 'start' event
-    import json
-    stream_sid = None
     
+    stream_sid = None
     # Wait for the start event
     import json
     import asyncio
@@ -296,36 +299,35 @@ async def websocket_endpoint(websocket: WebSocket):
             msg = json.loads(data)
             if msg.get("event") == "start":
                 stream_sid = msg["start"]["streamSid"]
-                
+
                 # Prevention of duplicate session creation via Postgres atomic insert
                 from sqlalchemy.exc import IntegrityError
                 from app.db.connection import db_manager
                 from app.db.models import ActiveStream
                 import os
-                
+
                 try:
                     async with db_manager.get_session() as db:
                         worker_id = str(os.getpid())  # Simple worker ID
                         active_stream = ActiveStream(stream_sid=stream_sid, worker_id=worker_id)
                         db.add(active_stream)
-                        # We don't strictly need flush here because get_session() yields and then commits, 
-                        # but flushing inside the try-block ensures IntegrityError is caught here instead of in the context manager.
                         await db.flush()
                 except IntegrityError:
                     logger.warning(f"[Worker-{os.getpid()}] Duplicate WebSocket connection for stream {stream_sid}. Already claimed by another worker. Rejecting.")
                     return
                 except Exception as e:
                     logger.error(f"[Worker-{os.getpid()}] Failed to claim stream ownership for {stream_sid}: {e}. Proceeding anyway...")
-                    
+
                 logger.info(f"[Worker-{os.getpid()}] Successfully claimed ownership of stream {stream_sid}")
-                
+
                 # Extract custom parameters from the start event
                 custom_params = msg["start"].get("customParameters", {})
                 phone_number = custom_params.get("phone", "unknown_client")
                 client_id_str = custom_params.get("client_id", "")
                 company_context = custom_params.get("company_context", "")
                 webhook_processing_start = float(custom_params.get("webhook_processing_start", 0.0))
-                
+                previous_summary = custom_params.get("previous_summary", "")
+
                 first_audio_packet = time.perf_counter()
                 connection_metrics = {
                     "webhook_processing_start": webhook_processing_start,
@@ -338,27 +340,30 @@ async def websocket_endpoint(websocket: WebSocket):
             elif msg.get("event") == "connected":
                 logger.info("Twilio connected event received")
                 continue
-                
+
         if not stream_sid:
             logger.error("Did not receive 'start' event from Twilio")
             await websocket.close()
             return
-            
+
     except Exception as ws_err:
         logger.error(f"WebSocket closed unexpectedly before start event: {ws_err}")
         return
-    
+
     transport = TwilioTransportAdapter(websocket=websocket, stream_sid=stream_sid)
-    
-    # ── Database Pre-fetch (Moved from handle_inbound_call) ──
-    previous_summary = ""
-    if client_id_str or phone_number != "unknown_client":
+
+    # ── Database Pre-fetch FALLBACK ──
+    # previous_summary normally already arrives via the TwiML custom param
+    # (fetched once in handle_inbound_call). We only hit the DB again here if
+    # that value is missing — e.g. the webhook's pre-fetch failed/timed out,
+    # or the client record didn't exist yet at webhook time.
+    if not previous_summary and (client_id_str or phone_number != "unknown_client"):
         try:
             from app.db.connection import db_manager
             from app.repositories.session_repository import SessionRepository
             from app.repositories.client_repository import ClientRepository
             import uuid
-            
+
             async def fetch_db_ws():
                 nonlocal client_id_str
                 async with db_manager.get_session() as db:
@@ -369,9 +374,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         client_uuid = client.id
                         # Update the outer client_id_str so it gets passed to run_voice_session
                         client_id_str = str(client_uuid)
-                        
+
                     return await SessionRepository.get_summary(db, client_uuid)
-                    
+
             summary_text = await asyncio.wait_for(fetch_db_ws(), timeout=3.0)
             if summary_text:
                 logger.info(f"Retrieved DB summary for {client_id_str}: {summary_text[:50]}...")
@@ -380,7 +385,7 @@ async def websocket_endpoint(websocket: WebSocket):
             logger.error("DB pre-fetch timed out after 3s in websocket. Proceeding without context.")
         except Exception as e:
             logger.error(f"Failed to fetch summary in websocket: {e}")
-    
+
     # Block and run the voice session on this websocket
     try:
         await run_voice_session(
@@ -804,8 +809,7 @@ def main() -> None:
     import uvicorn
     logger.info(f"TRANSPORT_MODE is set to '{TRANSPORT_MODE}'. Starting FastAPI server on port 8000...")
     # Always run the FastAPI server so the frontend can hit /api/livekit/join and /ws/frontend
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
-
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True, reload_dirs=["app"])
 
 if __name__ == "__main__":
     main()
