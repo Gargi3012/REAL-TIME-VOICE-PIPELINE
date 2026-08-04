@@ -101,7 +101,7 @@ TRANSITION_MAP: Dict[ConversationState, FrozenSet[ConversationState]] = {
         ConversationState.THINKING,  # Allowed for AI-initiated greetings without transcript
         ConversationState.GENERATING_RESPONSE, # LLM still streaming chunks
         ConversationState.GENERATING_AUDIO,    # TTS resuming after a pause
-        ConversationState.SPEAKING,            # TTS speaking resuming
+        ConversationState.SPEAKING,            # Allowed for initial AI greetings & resumption after interruption
         ConversationState.INTERRUPTED,
         ConversationState.ERROR,
         ConversationState.CLOSED,
