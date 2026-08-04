@@ -1,11 +1,4 @@
-"""
-Shared pytest fixtures for the session management test suite.
 
-Design:
-    Every test gets a fresh SessionManager and a pre-populated session so
-    that tests are fully isolated and deterministic.  Loguru is reconfigured
-    to capture log records in-memory for assertion without polluting stdout.
-"""
 
 from __future__ import annotations
 
@@ -19,6 +12,7 @@ from loguru import logger
 os.environ["ENABLE_INITIAL_GREETING"] = "False"
 
 from app.session import SessionManager, Session
+import pytest_asyncio
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -71,18 +65,19 @@ def manager(log_capture: LogCapture) -> SessionManager:
     return mgr
 
 
-@pytest.fixture()
-def session(manager: SessionManager) -> Session:
+
+@pytest_asyncio.fixture()
+async def session(manager: SessionManager) -> Session:
     """Return a pre-created session attached to the fixture manager."""
-    return manager.create_session(metadata={"env": "test"})
+    return await manager.create_session(metadata={"env": "test"})
 
 
-@pytest.fixture()
-def populated_session(manager: SessionManager, session: Session) -> Session:
+@pytest_asyncio.fixture()
+async def populated_session(manager: SessionManager, session: Session) -> Session:
     """Return a session pre-loaded with three messages (one per role)."""
-    manager.add_message(session.session_id, "system", "You are a test bot.")
-    manager.add_message(session.session_id, "user", "Hello!")
-    manager.add_message(session.session_id, "assistant", "Hi there!")
+    await manager.add_message(session.session_id, "system", "You are a test bot.")
+    await manager.add_message(session.session_id, "user", "Hello!")
+    await manager.add_message(session.session_id, "assistant", "Hi there!")
     return session
 
 # ──────────────────────────────────────────────────────────────────────
@@ -111,3 +106,16 @@ async def db_session(db_engine):
     )
     async with async_session() as session:
         yield session
+
+
+@pytest.fixture(autouse=True)
+def mock_pipecat_runners():
+    """Autouse fixture to mock PipelineRunner.run and WorkerRunner.run in all tests."""
+    from unittest.mock import patch
+    try:
+        with patch("pipecat.pipeline.runner.PipelineRunner.run") as r1, \
+             patch("pipecat.pipeline.runner.WorkerRunner.run", create=True) as r2:
+            yield r1, r2
+    except Exception:
+        yield None
+

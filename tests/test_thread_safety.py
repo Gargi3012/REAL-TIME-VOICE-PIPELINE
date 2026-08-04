@@ -1,146 +1,140 @@
 """
-Thread safety stress tests for SessionManager.
+Asynchronous concurrency safety stress tests for SessionManager.
 
-Spawns multiple threads performing concurrent CRUD + message operations
+Spawns multiple concurrent async tasks performing CRUD + message operations
 and verifies no crashes, corrupted state, or data loss.
 """
 
 from __future__ import annotations
 
-import threading
-
+import asyncio
+import pytest
 
 from app.session import SessionManager, SessionState
 
 
 class TestConcurrentCreation:
-    """Multiple threads creating sessions simultaneously."""
+    """Multiple concurrent tasks creating sessions simultaneously."""
 
-    def test_100_concurrent_creates(self, manager: SessionManager) -> None:
+    @pytest.mark.asyncio
+    async def test_100_concurrent_creates(self, manager: SessionManager) -> None:
         errors: list[Exception] = []
 
-        def create() -> None:
+        async def create() -> None:
             try:
-                manager.create_session()
+                await manager.create_session()
             except Exception as e:
                 errors.append(e)
 
-        threads = [threading.Thread(target=create) for _ in range(100)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join(timeout=5)
+        await asyncio.gather(*(create() for _ in range(100)))
 
         assert not errors
-        assert manager.total_sessions() == 100
+        assert (await manager.total_sessions()) == 100
 
 
 class TestConcurrentCreateDelete:
-    """Threads creating and deleting sessions simultaneously."""
+    """Concurrent tasks creating and deleting sessions simultaneously."""
 
-    def test_create_and_delete(self, manager: SessionManager) -> None:
+    @pytest.mark.asyncio
+    async def test_create_and_delete(self, manager: SessionManager) -> None:
         # Pre-create sessions to delete
-        ids = [manager.create_session().session_id for _ in range(50)]
+        ids = []
+        for _ in range(50):
+            s = await manager.create_session()
+            ids.append(s.session_id)
+            
         errors: list[Exception] = []
 
-        def create_batch() -> None:
+        async def create_batch() -> None:
             try:
                 for _ in range(50):
-                    manager.create_session()
+                    await manager.create_session()
             except Exception as e:
                 errors.append(e)
 
-        def delete_batch() -> None:
+        async def delete_batch() -> None:
             try:
                 for sid in ids:
-                    manager.delete_session(sid)
+                    await manager.delete_session(sid)
             except Exception as e:
                 errors.append(e)
 
-        t1 = threading.Thread(target=create_batch)
-        t2 = threading.Thread(target=delete_batch)
-        t1.start()
-        t2.start()
-        t1.join(timeout=5)
-        t2.join(timeout=5)
+        await asyncio.gather(create_batch(), delete_batch())
 
         assert not errors
         # 50 original deleted + 50 new created = 50 remaining
-        assert manager.total_sessions() == 50
+        assert (await manager.total_sessions()) == 50
 
 
 class TestConcurrentMessages:
-    """Multiple threads adding messages to the same session."""
+    """Multiple concurrent tasks adding messages to the same session."""
 
-    def test_concurrent_message_adds(self, manager: SessionManager) -> None:
-        session = manager.create_session()
+    @pytest.mark.asyncio
+    async def test_concurrent_message_adds(self, manager: SessionManager) -> None:
+        session = await manager.create_session()
         sid = session.session_id
-        n_threads = 10
+        n_tasks = 10
         n_msgs = 50
         errors: list[Exception] = []
 
-        def add_messages(thread_id: int) -> None:
+        async def add_messages(task_id: int) -> None:
             try:
                 for i in range(n_msgs):
-                    manager.add_message(sid, "user", f"t{thread_id}-m{i}")
+                    await manager.add_message(sid, "user", f"t{task_id}-m{i}")
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=add_messages, args=(i,))
-            for i in range(n_threads)
-        ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join(timeout=10)
+        await asyncio.gather(*(add_messages(i) for i in range(n_tasks)))
 
         assert not errors
-        history = manager.get_history(sid)
+        history = await manager.get_history(sid)
         assert history is not None
-        assert len(history) == n_threads * n_msgs
+        assert len(history) == n_tasks * n_msgs
 
 
 class TestConcurrentMixedOps:
-    """Threads performing reads, writes, deletes, and state changes."""
+    """Tasks performing concurrent reads, writes, deletes, and state changes."""
 
-    def test_mixed_operations(self, manager: SessionManager) -> None:
-        sessions = [manager.create_session() for _ in range(20)]
+    @pytest.mark.asyncio
+    async def test_mixed_operations(self, manager: SessionManager) -> None:
+        sessions = []
+        for _ in range(20):
+            s = await manager.create_session()
+            sessions.append(s)
+            
         errors: list[Exception] = []
 
-        def reader() -> None:
+        async def reader() -> None:
             try:
                 for s in sessions:
-                    manager.get_session(s.session_id)
-                    manager.get_history(s.session_id)
-                    manager.session_exists(s.session_id)
+                    await manager.get_session(s.session_id)
+                    await manager.get_history(s.session_id)
+                    await manager.session_exists(s.session_id)
             except Exception as e:
                 errors.append(e)
 
-        def writer() -> None:
+        async def writer() -> None:
             try:
                 for s in sessions:
-                    manager.add_message(s.session_id, "user", "concurrent")
-                    manager.update_last_activity(s.session_id)
+                    await manager.add_message(s.session_id, "user", "concurrent")
+                    await manager.update_last_activity(s.session_id)
             except Exception as e:
                 errors.append(e)
 
-        def state_changer() -> None:
+        async def state_changer() -> None:
             try:
                 for s in sessions:
-                    manager.set_state(s.session_id, SessionState.LISTENING)
-                    manager.set_state(s.session_id, SessionState.IDLE)
+                    await manager.set_state(s.session_id, SessionState.LISTENING)
+                    await manager.set_state(s.session_id, SessionState.IDLE)
             except Exception as e:
                 errors.append(e)
 
-        threads = (
-            [threading.Thread(target=reader) for _ in range(3)]
-            + [threading.Thread(target=writer) for _ in range(3)]
-            + [threading.Thread(target=state_changer) for _ in range(2)]
+        # Mix of readers, writers, and state changers
+        tasks = (
+            [reader() for _ in range(3)]
+            + [writer() for _ in range(3)]
+            + [state_changer() for _ in range(2)]
         )
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join(timeout=10)
+        await asyncio.gather(*tasks)
 
         assert not errors

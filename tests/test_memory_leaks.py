@@ -23,22 +23,22 @@ async def test_memory_leaks() -> None:
     
     # Warmup
     for i in range(10):
-        s = manager.create_session()
+        s = await manager.create_session()
         b = PipelineBuilder(bus, s.session_id)
         b.add_processor(ProcessorNode(f"STT_{i}", ProcessorRole.STT))
         p = b.build()
-        manager.delete_session(s.session_id)
+        await manager.delete_session(s.session_id)
         
     gc.collect()
     snapshot1 = tracemalloc.take_snapshot()
     
     # Stress iteration
     for i in range(1000): # Using 1000 instead of 5000 to keep test execution fast
-        s = manager.create_session()
+        s = await manager.create_session()
         b = PipelineBuilder(bus, s.session_id)
         b.add_processor(ProcessorNode(f"STT_{i}", ProcessorRole.STT))
         b.build()
-        manager.delete_session(s.session_id)
+        await manager.delete_session(s.session_id)
         
     gc.collect()
     snapshot2 = tracemalloc.take_snapshot()
