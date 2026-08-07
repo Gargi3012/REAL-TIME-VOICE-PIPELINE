@@ -869,3 +869,20 @@ Successfully migrated the entire unit testing suite to native async execution to
 - **Dual-Transport Architecture Fix**: Updated `app/main.py` and `app/main_test.py` to dynamically inspect transport type using `isinstance(transport, LiveKitTransportAdapter)` rather than branching on the global `TRANSPORT_MODE` configuration. This resolves a critical bug where Twilio calls crashed when the backend was configured in LiveKit mode.
 - **Verification**: Ran the full test suite and confirmed that all 450 tests passed successfully with 100% correctness on native async event loops (450/450 tests passed).
 
+---
+
+## Milestone — Latency Filler & Tool Interceptor Stability Patches
+**Date**: 2026-08-07
+**Status**: ✅ Complete — Implemented, Tested, and Pushed
+
+### Overview
+Addressed edge case bugs regarding call termination during conversational turn-ends:
+1. Resolved a race condition where the Latency Filler's `TTSStoppedFrame` triggered premature call hangups before the bot's actual goodbye response finished playing.
+2. Implemented text-based fallback tag interception for the `end_call` tool when native function calling is bypassed by the LLM.
+
+### Actions Taken
+- **Filler Disabling on Hangup**: Passed `shared_state` to `LatencyFillerProcessor` and disabled filler scheduling/triggering once `hangup_requested` is flagged.
+- **Filler Frame Tagging**: Tagged filler-generated `TTSStoppedFrames` with `.is_filler = True` metadata and configured the `CallTerminationProcessor` to ignore them.
+- **Fallback Tag Interceptor**: Upgraded `ToolInterceptionProcessor` to parse text-based `function=end_call>` tag structures dynamically, stripping them from the audio stream and setting `hangup_requested = True` in the shared state dictionary.
+- **Verification**: Executed the test suite; confirmed all 450 unit tests pass cleanly. Live calls now terminate gracefully immediately following bot goodbye responses.
+
