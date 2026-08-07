@@ -242,7 +242,7 @@ def _build_real_pipeline_task(
                 new_processors.append(user_agg)
                 new_processors.append(filler_processor)
                 new_processors.append(p)
-                new_processors.append(ToolInterceptionProcessor())
+                new_processors.append(ToolInterceptionProcessor(shared_state=shared_state))
             elif p.__class__.__name__.endswith("TTSService"):
                 new_processors.append(p)
                 new_processors.append(CallTerminationProcessor(shared_state=shared_state))
