@@ -88,6 +88,9 @@ class CallTerminationProcessor(FrameProcessor):
         
         # When bot finishes its response, if hangup requested and LLM is done, queue EndTaskFrame or CancelFrame
         if isinstance(frame, TTSStoppedFrame):
+            if getattr(frame, "is_filler", False):
+                logger.info("CallTerminationProcessor: Ignoring filler TTSStoppedFrame.")
+                return
             logger.info(f"CallTerminationProcessor saw TTSStoppedFrame. state: {self.shared_state} | llm_completed={self.llm_response_completed}")
             if self.shared_state.get("hangup_requested") and self.llm_response_completed:
                 logger.warning("CallTerminationProcessor: Bot finished responding to goodbye. Terminating the call via master Task.")

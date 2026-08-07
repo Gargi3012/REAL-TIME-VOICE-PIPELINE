@@ -13,7 +13,7 @@ class LatencyFillerProcessor(FrameProcessor):
     Monitors transcription frames and plays a short filler audio 
     if the LLM response is delayed by more than a given threshold.
     """
-    def __init__(self, filler_wav_paths: list[str] = None, delay_threshold_ms: int = 400, event_bus = None, session_id = None, **kwargs):
+    def __init__(self, filler_wav_paths: list[str] = None, delay_threshold_ms: int = 400, event_bus = None, session_id = None, shared_state = None, **kwargs):
         super().__init__(**kwargs)
         if filler_wav_paths is None:
             filler_wav_paths = ["hmm.wav", "wait_a_minute.wav", "let_me_think.wav"]
@@ -23,6 +23,7 @@ class LatencyFillerProcessor(FrameProcessor):
         self._audio_frames_list = []
         self.event_bus = event_bus
         self.session_id = session_id
+        self.shared_state = shared_state if shared_state is not None else {}
         
         if self.event_bus and self.session_id:
             asyncio.create_task(self._subscribe_to_events())
@@ -67,6 +68,9 @@ class LatencyFillerProcessor(FrameProcessor):
             
         try:
             await asyncio.sleep(self.delay_threshold)
+            if self.shared_state.get("hangup_requested"):
+                logger.debug("Hangup requested, skipping filler playback.")
+                return
             logger.info(f"LLM response delayed > {self.delay_threshold}s. Playing filler audio...")
             
             # Use self.push_frame directly. Note: Pipecat processor queues handles concurrent push_frame safely.
@@ -76,7 +80,11 @@ class LatencyFillerProcessor(FrameProcessor):
             for frame in audio_frames:
                 await self.push_frame(frame, FrameDirection.DOWNSTREAM)
                 await asyncio.sleep(0.01) # Yield to event loop, simulate streaming
-            await self.push_frame(TTSStoppedFrame(), FrameDirection.DOWNSTREAM)
+            
+            # Tag this stop frame as filler so CallTerminationProcessor knows to ignore it
+            stop_frame = TTSStoppedFrame()
+            stop_frame.is_filler = True
+            await self.push_frame(stop_frame, FrameDirection.DOWNSTREAM)
             
         except asyncio.CancelledError:
             # Task was cancelled because LLM responded fast enough!
@@ -105,6 +113,9 @@ class LatencyFillerProcessor(FrameProcessor):
             messages = frame.context.messages if hasattr(frame.context, "messages") else frame.context.get_messages()
             is_user_msg = any(m.get("role") == "user" for m in messages)
             if is_user_msg:
+                if self.shared_state.get("hangup_requested"):
+                    logger.debug("Hangup requested, not starting filler wait task.")
+                    return
                 if self._wait_task and not self._wait_task.done():
                     self._wait_task.cancel()
                 self._wait_task = asyncio.create_task(self._play_filler_if_delayed())
