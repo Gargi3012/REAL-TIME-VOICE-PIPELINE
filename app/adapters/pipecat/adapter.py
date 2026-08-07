@@ -225,7 +225,8 @@ def _build_real_pipeline_task(
             filler_wav_paths=filler_wavs,
             delay_threshold_ms=1000,
             event_bus=event_bus,
-            session_id=session_id
+            session_id=session_id,
+            shared_state=shared_state
         )
         
         # Instantiate greeting processor if greetings.wav exists and it's a new customer
