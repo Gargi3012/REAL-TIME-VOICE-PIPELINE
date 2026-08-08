@@ -47,6 +47,8 @@ import time
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import livekit_router
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+load_dotenv()
 
 APP_STATE = {"is_ready": False}
 
@@ -101,6 +103,14 @@ async def lifespan(app: FastAPI):
     except Exception as faq_err:
         logger.error(f"Failed to refresh FAQ cache on startup: {faq_err}")
 
+    # Ensure Qdrant vector DB collections exist (FAQ semantic search + pending FAQs)
+    try:
+        from app.services.vector_store import ensure_collections
+        ensure_collections()
+        logger.info("Qdrant vector store collections verified/created on startup.")
+    except Exception as vector_err:
+        logger.error(f"Failed to initialize Qdrant vector store (will degrade gracefully): {vector_err}")
+        
     # Mark as ready regardless of DB to allow graceful degradation
     APP_STATE["is_ready"] = True
     
