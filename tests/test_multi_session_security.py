@@ -24,11 +24,11 @@ async def test_multi_session_race_conditions() -> None:
     
     async def simulate_user(idx: int) -> None:
         # Create
-        session = manager.create_session()
+        session = await manager.create_session()
         sid = session.session_id
         
         # Add message
-        manager.add_message(sid, "user", f"msg {idx}")
+        await manager.add_message(sid, "user", f"msg {idx}")
         
         # Publish event
         evt = PipelineStarted(
@@ -50,11 +50,11 @@ async def test_multi_session_race_conditions() -> None:
         await asyncio.sleep(random.uniform(0.001, 0.01))
         
         fsm.transition_to(ConversationState.CLOSED)
-        manager.delete_session(sid)
+        await manager.delete_session(sid)
         
     tasks = [asyncio.create_task(simulate_user(i)) for i in range(100)]
     
     await asyncio.gather(*tasks)
     
     # Assert deterministic finish
-    assert manager.total_sessions() == 0
+    assert (await manager.total_sessions()) == 0

@@ -548,7 +548,8 @@ async def run_voice_session(
     )
     logger.info("PipecatAdapter ready | execution_id={eid}", eid=execution_id)
 
-    if TRANSPORT_MODE.lower() == "livekit":
+    from app.adapters.pipecat.transport import LiveKitTransportAdapter
+    if isinstance(transport, LiveKitTransportAdapter):
         raw_transport = transport.get_pipecat_transport()
         @raw_transport.event_handler("on_participant_disconnected")
         async def on_participant_disconnected(transport_instance, participant_id):
