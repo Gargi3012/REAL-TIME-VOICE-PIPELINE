@@ -856,7 +856,6 @@ A comprehensive sprint to resolve critical turn-end call teardown bugs, enforce 
 - **Verification**: Updated [test_company_faq.py](file:///d:/REAL-TIME-VOICE-PIPELINE/tests/test_company_faq.py) and [test_pipecat_adapter.py](file:///d:/REAL-TIME-VOICE-PIPELINE/tests/test_pipecat_adapter.py) to support database mock scopes, and added [test_livekit_auth.py](file:///d:/REAL-TIME-VOICE-PIPELINE/tests/test_livekit_auth.py) checking JWT validation. All unit tests successfully compiled and passed.
 
 ---
-
 ## Milestone — Test Suite Async Migration & Dual-Transport Architecture Patch
 **Date**: 2026-08-04
 **Status**: ✅ Complete — 450/450 Tests Passing
@@ -886,3 +885,11 @@ Addressed edge case bugs regarding call termination during conversational turn-e
 - **Fallback Tag Interceptor**: Upgraded `ToolInterceptionProcessor` to parse text-based `function=end_call>` tag structures dynamically, stripping them from the audio stream and setting `hangup_requested = True` in the shared state dictionary.
 - **Verification**: Executed the test suite; confirmed all 450 unit tests pass cleanly. Live calls now terminate gracefully immediately following bot goodbye responses.
 
+---
+
+## Milestone — Self-Improving FAQ System with Qdrant Vector Search
+**Date**: 2026-08-09
+**Status**: ✅ Complete — Implemented and Tested
+
+### Overview
+Extended the existing keyword-based FAQ lookup (`fetch_faq` tool) with a semantic vector search fallback and an automatic capture mechanism for unanswered caller questions, so the knowledge base can grow from real caller behavior instead of manual curation alone. This is the first piece of the broader RAG-based knowledge system planned for the
