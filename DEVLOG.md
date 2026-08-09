@@ -854,3 +854,34 @@ A comprehensive sprint to resolve critical turn-end call teardown bugs, enforce 
   - Implemented `/api/login` and `/api/register` endpoints in `app/routers/livekit_router.py` and enforced `Depends(verify_jwt)` on LiveKit join and Twilio outbound dial routes.
   - Built a glassmorphic dark-theme authentication card overlay on the frontend (`index.html`, `styles.css`, `app.js`) to support secure login and dynamic user sign-up/registration.
 - **Verification**: Updated [test_company_faq.py](file:///d:/REAL-TIME-VOICE-PIPELINE/tests/test_company_faq.py) and [test_pipecat_adapter.py](file:///d:/REAL-TIME-VOICE-PIPELINE/tests/test_pipecat_adapter.py) to support database mock scopes, and added [test_livekit_auth.py](file:///d:/REAL-TIME-VOICE-PIPELINE/tests/test_livekit_auth.py) checking JWT validation. All unit tests successfully compiled and passed.
+
+---
+
+## Milestone — Self-Improving FAQ System with Qdrant Vector Search
+**Date**: 2026-08-09
+**Status**: ✅ Complete — Implemented and Tested
+
+### Overview
+Extended the existing keyword-based FAQ lookup (`fetch_faq` tool) with a semantic vector search fallback and an automatic capture mechanism for unanswered caller questions, so the knowledge base can grow from real caller behavior instead of manual curation alone. This is the first piece of the broader RAG-based knowledge system planned for the pipeline.
+
+### Actions Taken
+- **Local Embedding Service** (`app/services/embedding_service.py`): Added a singleton wrapper around `sentence-transformers` (`all-MiniLM-L6-v2`, 384-dim) so the model loads once at startup rather than per-request. Kept embeddings fully local to preserve the "no external LLM dependency" architecture and avoid added network latency on live calls.
+- **Qdrant Vector Store Service** (`app/services/vector_store.py`): Wraps a Qdrant Cloud cluster with two collections — `faq_knowledge_base` (approved Q&A pairs for semantic matching) and `pending_faqs` (unanswered caller questions awaiting review). Exposes `search_faq`, `store_pending_faq`, `add_faq`, and list/delete helpers for the review workflow. All embedding and Qdrant I/O calls are offloaded via `asyncio.run_in_executor` to avoid blocking the event loop during live audio streaming.
+- **Semantic Fallback in `fetch_faq`** (`app/services/faq_manager.py`): When the existing keyword search returns no results, the tool now embeds the query and runs a cosine-similarity search (threshold 0.75) against the approved FAQ collection before giving up. If neither keyword nor semantic search finds a match, the question is stored in `pending_faqs` — the caller-facing "I don't have that information" response is unchanged, so this is a purely additive capture layer.
+- **Startup Integration** (`app/main.py`): Added `ensure_collections()` to the `lifespan` startup sequence, idempotently creating both Qdrant collections on boot. Follows the same graceful-degradation pattern as existing DB/FAQ-cache startup steps — a Qdrant outage logs an error but does not prevent the app from serving calls.
+- **Human Review Tooling** (`scripts/review_pending_faqs.py`): Interactive CLI that lists pending questions with caller metadata (phone, session ID) and lets a reviewer approve (with a written answer, promoting it into `faq_knowledge_base`), skip, or permanently delete each entry.
+- **Dependencies**: Added `qdrant-client==1.19.0` and `sentence-transformers==5.7.0` to `requirements.txt`.
+
+### Verification
+- Confirmed both Qdrant collections are created on server startup via logs: `Qdrant vector store collections verified/created on startup.`
+- Verified `search_faq` / `store_pending_faq` directly against the live Qdrant Cloud cluster (`tests/test_vector_direct.py`) — correctly returns `None` on an empty collection and successfully persists a pending entry.
+- Verified the full `fetch_faq` fallback chain end-to-end: keyword miss → semantic miss → question stored in `pending_faqs`.
+- Verified the review CLI's list, approve-and-promote, and delete flows against a live pending entry.
+
+### Known Limitations / Next Steps
+- `add_faq()` currently writes only to Qdrant, not the Postgres FAQ table used by keyword search — an approved pending FAQ is discoverable via semantic search immediately, but not yet via keyword search until it's also added to Postgres. Syncing both stores on promotion is the next step.
+- Semantic search only runs as a last-resort fallback after keyword search finds zero results, so a keyword false-positive (e.g. a common word like "offer" matching an unrelated FAQ) can currently mask a case where semantic search would have been more accurate.
+- Review is CLI-only for now; a follow-up will expose this as an authenticated admin API endpoint using the existing JWT auth (`auth_service.py`) so non-technical team members can review from a browser.
+
+### Conclusion
+The FAQ system now has a semantic safety net and a feedback loop: questions the agent can't answer are no longer silently lost, they're captured, reviewable, and promotable into the knowledge base — laying the foundation for the planned Pinecone/RAG integration.
