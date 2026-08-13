@@ -13,6 +13,7 @@ Run with:
 
 import os
 import time
+import pytest
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 
@@ -46,6 +47,7 @@ def measure_fragment_ttfb(client, voice_id: str, text: str) -> float:
     return -1.0  # no audio returned at all — a real failure, not just slow
 
 
+@pytest.mark.skipif(not os.getenv("ELEVEN_LABS_API_KEY"), reason="ELEVEN_LABS_API_KEY not set")
 def test_llm_fragment_latency():
     api_key = os.getenv("ELEVEN_LABS_API_KEY")
     voice_id = os.getenv("ELEVEN_LABS_VOICE_ID")

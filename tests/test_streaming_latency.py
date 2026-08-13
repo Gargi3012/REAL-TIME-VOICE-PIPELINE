@@ -11,6 +11,7 @@ Run with:
 
 import os
 import time
+import pytest
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 
@@ -38,6 +39,7 @@ def measure_ttfb(client, voice_id: str, latency_opt: int) -> float:
     return first_chunk_time - start
 
 
+@pytest.mark.skipif(not os.getenv("ELEVEN_LABS_API_KEY"), reason="ELEVEN_LABS_API_KEY not set")
 def test_latency_levels():
     api_key = os.getenv("ELEVEN_LABS_API_KEY")
     voice_id = os.getenv("ELEVEN_LABS_VOICE_ID")

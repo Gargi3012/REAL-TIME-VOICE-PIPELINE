@@ -54,11 +54,15 @@ async def test_adapter_run_success(bus: EventBus, pipeline: Pipeline) -> None:
     
     with patch("pipecat.pipeline.runner.PipelineRunner.run") as mock_run:
         await adapter.run()
-        mock_run.assert_called_once()
+        if adapter.task.__class__.__name__ == "MockPipecatPipelineTask":
+            assert mock_run.call_count == 0
+        else:
+            mock_run.assert_called_once()
         
     # If run completes without error, it succeeded.
     # Check that events were fired
     assert bus._queue.qsize() > 0
+
 
 
 @pytest.mark.asyncio

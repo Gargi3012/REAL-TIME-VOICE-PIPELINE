@@ -27,4 +27,5 @@ async def test_fetch():
     client_id_str, summary_text = await asyncio.wait_for(fetch_db(), timeout=3.0)
     print("Final result:", client_id_str)
 
-asyncio.run(test_fetch())
+if __name__ == "__main__":
+    asyncio.run(test_fetch())

@@ -19,4 +19,5 @@ async def main():
     )
     print("Done — check Qdrant dashboard 'pending_faqs' collection now.")
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
