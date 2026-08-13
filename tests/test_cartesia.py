@@ -1,9 +1,11 @@
 import asyncio
 import os
+import pytest
 from dotenv import load_dotenv
 
 load_dotenv()
 
+@pytest.mark.skipif(not os.getenv("CARTESIA_API_KEY"), reason="CARTESIA_API_KEY not set")
 async def test_cartesia():
     from pipecat.services.cartesia.tts import CartesiaTTSService
     from pipecat.frames.frames import TextFrame
