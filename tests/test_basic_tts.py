@@ -9,12 +9,14 @@ Run with:
 """
 
 import os
+import pytest
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
+@pytest.mark.skipif(not os.getenv("ELEVEN_LABS_API_KEY"), reason="ELEVEN_LABS_API_KEY not set")
 def test_basic_generation():
     api_key = os.getenv("ELEVEN_LABS_API_KEY")
     voice_id = os.getenv("ELEVEN_LABS_VOICE_ID")
