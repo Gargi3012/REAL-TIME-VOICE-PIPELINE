@@ -63,10 +63,12 @@ jobs:
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
           cd /home/ec2-user/REAL-TIME-VOICE-PIPELINE
-          # Build Docker image using the Dockerfile
-          docker build -t voice-pipeline-app .
+          # Ensure .env file exists so docker run doesn't fail
+          touch .env
+          # Build Docker image using the Dockerfile (using sudo for permissions)
+          sudo docker build -t voice-pipeline-app .
           # Stop and remove old container if running
-          docker stop voice-pipeline || true
-          docker rm voice-pipeline || true
-          # Run the new container, referencing the .env file already present on the server
-          docker run -d --name voice-pipeline -p 8000:8000 --env-file .env voice-pipeline-app
+          sudo docker stop voice-pipeline || true
+          sudo docker rm voice-pipeline || true
+          # Run the new container, referencing the .env file (using sudo for permissions)
+          sudo docker run -d --name voice-pipeline -p 8000:8000 --env-file .env voice-pipeline-app
