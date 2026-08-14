@@ -36,58 +36,39 @@ jobs:
         # Runs the unit and integration tests before deployment
         python -m pytest
 
-#   deploy:
-#     name: Build Docker & Push to AWS ECR
-#     needs: test
-#     runs-on: ubuntu-latest
-#     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-# 
-#     steps:
-#     - name: Checkout Code
-#       uses: actions/checkout@v4
-# 
-#     - name: Configure AWS Credentials
-#       uses: aws-actions/configure-aws-credentials@v4
-#       with:
-#         # Add these variables to your GitHub Repository Secrets:
-#         # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
-#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#         aws-region: ${{ secrets.AWS_REGION }}
-# 
-#     - name: Log in to Amazon ECR
-#       id: login-ecr
-#       uses: aws-actions/amazon-ecr-login@v2
-# 
-#     - name: Build, Tag, and Push Image to Amazon ECR
-#       env:
-#         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-#         # Add your AWS ECR Repository name to GitHub Repository Secrets as AWS_ECR_REPOSITORY_NAME
-#         ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY_NAME }}
-#         IMAGE_TAG: ${{ github.sha }}
-#       run: |
-#         # Build the Docker image using the Dockerfile
-#         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-#         
-#         # Push both target commit SHA tag and 'latest' tag to ECR
-#         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-#         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-# 
-#     # =========================================================================
-#     # OPTIONAL: AWS ECS Deployment (Uncomment below if using ECS)
-#     # =========================================================================
-#     # - name: Fill in the new image ID in the Amazon ECS task definition
-#     #   id: task-def
-#     #   uses: aws-actions/amazon-ecs-render-task-definition@v1
-#     #   with:
-#     #     task-definition: task-definition.json
-#     #     container-name: voice-pipeline-container
-#     #     image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_REPOSITORY_NAME }}:${{ github.sha }}
-#     #
-#     # - name: Deploy Amazon ECS task definition
-#     #   uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-#     #   with:
-#     #     task-definition: ${{ steps.task-def.outputs.task-definition }}
-#     #     service: ${{ secrets.AWS_ECS_SERVICE_NAME }}
-#     #     cluster: ${{ secrets.AWS_ECS_CLUSTER_NAME }}
-#     #     wait-for-service-stability: true
+  deploy:
+    name: Deploy to AWS EC2
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Copy files via SSH/SCP
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "."
+        target: "/home/ec2-user/REAL-TIME-VOICE-PIPELINE"
+
+    - name: Run Deploy Script on EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          cd /home/ec2-user/REAL-TIME-VOICE-PIPELINE
+          # Ensure .env file exists so docker run doesn't fail
+          touch .env
+          # Build Docker image using the Dockerfile (using sudo for permissions)
+          sudo docker build -t voice-pipeline-app .
+          # Stop and remove old container if running
+          sudo docker stop voice-pipeline || true
+          sudo docker rm voice-pipeline || true
+          # Run the new container, referencing the .env file (using sudo for permissions)
+          sudo docker run -d --name voice-pipeline -p 8000:8000 --env-file .env voice-pipeline-app

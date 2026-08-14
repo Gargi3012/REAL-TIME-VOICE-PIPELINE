@@ -9,14 +9,18 @@ ENV PORT=8000
 # Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies (build-essential is required for some C++ dependencies)
+# Install system dependencies (build-essential, audio dev packages, and curl)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    portaudio19-dev \
+    libasound2-dev \
+    libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements.txt and install Python dependencies
 COPY requirements.txt .
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
