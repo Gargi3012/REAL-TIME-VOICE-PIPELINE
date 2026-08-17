@@ -29,5 +29,5 @@ COPY . .
 # Expose the application port
 EXPOSE 8000
 
-# Run the application with Gunicorn using Uvicorn workers (reduced to 1 worker to fit 1GB RAM)
-CMD ["gunicorn", "app.main:app", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+# Run the application with Gunicorn using Uvicorn workers (reduced to 1 worker, 10-minute timeout for slow EC2)
+CMD ["gunicorn", "app.main:app", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--timeout", "600", "--bind", "0.0.0.0:8000"]
