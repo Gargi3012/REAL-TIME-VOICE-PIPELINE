@@ -167,10 +167,15 @@ class VoicePipelineClient {
         this.ui = ui;
         this.ws = null;
         this.room = null;
-        this.API_BASE = '/api/livekit'; // Backend API (Relative path)
+        // Dynamic path prefix detection for sub-path reverse proxying (e.g. /voice)
+        const path = window.location.pathname;
+        const match = path.match(/(.*)\/frontend\//);
+        this.prefix = match ? match[1] : "";
+        
+        this.API_BASE = `${this.prefix}/api/livekit`; // Backend API (Dynamic)
         
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        this.WS_URL = `${wsProtocol}//${window.location.host}/ws/frontend`; // Backend WS (Dynamic)
+        this.WS_URL = `${wsProtocol}//${window.location.host}${this.prefix}/ws/frontend`; // Backend WS (Dynamic)
         
         // Auth token initialization
         this.token = localStorage.getItem('jwt_token') || '';
@@ -252,7 +257,7 @@ class VoicePipelineClient {
             return;
         }
 
-        const endpoint = this.isRegisterMode ? '/api/register' : '/api/login';
+        const endpoint = this.isRegisterMode ? `${this.prefix}/api/register` : `${this.prefix}/api/login`;
 
         try {
             const response = await fetch(endpoint, {
@@ -450,7 +455,7 @@ class VoicePipelineClient {
         this.ui.updateMetrics(0, '-', '-');
 
         try {
-            const response = await fetch('/api/twilio/outbound', {
+            const response = await fetch(`${this.prefix}/api/twilio/outbound`, {
                 method: 'POST',
                 headers: this.getAuthHeaders(),
                 body: JSON.stringify({ phoneNumber: phoneNumber })
