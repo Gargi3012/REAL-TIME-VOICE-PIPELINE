@@ -34,7 +34,7 @@ LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # "openai" | "groq"
 
 # ── Groq (LLM) ────────────────────────────────────────────────────────
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama3-8b-8192")
 GROQ_WHISPER_MODEL: str = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
 
 # ── OpenAI (LLM) ──────────────────────────────────────────────────────

@@ -144,7 +144,7 @@ async def lifespan(app: FastAPI):
         
     await db_manager.close()
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, root_path=os.getenv("ROOT_PATH", ""))
 
 @app.get("/health")
 def health_check():
