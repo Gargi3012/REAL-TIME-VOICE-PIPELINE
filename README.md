@@ -1,8 +1,16 @@
-# Real-Time Voice Pipeline
+<h1 align="center">Real-Time Voice Pipeline</h1>
 
-[![Python](https://img.shields.io/badge/Python-3.14%2B-blue)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-green)](https://fastapi.tiangolo.com)
-[![Pipecat](https://img.shields.io/badge/Pipecat-1.5.0-orange)](https://pipecat.ai)
+<p align="center">
+  <a href="https://python.org">
+    <img src="https://img.shields.io/badge/Python-3.14%2B-blue" alt="Python">
+  </a>
+  <a href="https://fastapi.tiangolo.com">
+    <img src="https://img.shields.io/badge/FastAPI-0.100%2B-green" alt="FastAPI">
+  </a>
+  <a href="https://pipecat.ai">
+    <img src="https://img.shields.io/badge/Pipecat-1.5.0-orange" alt="Pipecat">
+  </a>
+</p>
 
 ## 1. Project Overview
 This project is a **real-time conversational AI voice assistant backend** built around a highly modular, decoupled architecture. 
@@ -25,31 +33,26 @@ It provides an orchestration framework capable of handling streaming audio and b
 
 ## 2. Architecture Diagram
 
-```text
-       User
-         │
-         ▼
-     Transport
- (LiveKit / Twilio)
-         │
-         ▼
-    Deepgram STT
-         │
-         ▼
- Conversation Pipeline
-(Session → FSM → EventBus → Pipeline Runner)
-         │
-         ▼
-        LLM
-(Groq / OpenAI / Gemini)
-         │
-         ▼
-        TTS
-(ElevenLabs / Cartesia)
-         │
-         ▼
-   Audio Response
+```mermaid
+flowchart TD
+    A[User] --> B[Transport]
+    B --> C[Deepgram STT]
+    C --> D[Conversation Pipeline]
+    D --> E[LLM]
+    E --> F[TTS]
+    F --> G[Audio Response]
+
+    B_NOTE["LiveKit or Twilio"]
+    D_NOTE["Session → FSM → EventBus → Pipeline Runner"]
+    E_NOTE["Groq or OpenAI or Gemini"]
+    F_NOTE["ElevenLabs or Cartesia"]
+
+    B --- B_NOTE
+    D --- D_NOTE
+    E --- E_NOTE
+    F --- F_NOTE
 ```
+
 
 ## 3. Features
 
