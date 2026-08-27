@@ -546,12 +546,17 @@ async def run_voice_session(
                     async for chunk in summary_client.stream_response(summary_messages):
                         generated_summary += chunk
                     generated_summary = generated_summary.strip()
+                    import re
+                    # Strip Qwen / DeepSeek internal <think>...</think> reasoning chain blocks
+                    generated_summary = re.sub(r'<think>.*?</think>', '', generated_summary, flags=re.DOTALL).strip()
+                    if "Here's a thinking process:" in generated_summary:
+                        generated_summary = generated_summary.split("\n\n")[-1].strip()
+                    
                     if not generated_summary:
                         generated_summary = prev_summary_text  # fallback: keep old summary
                     
                     # Extract overall emotion using regex
                     overall_emotion = "Neutral"
-                    import re
                     match = re.search(r'\[Overall Call Emotion:\s*(.*?)\]', generated_summary, re.IGNORECASE)
                     if match:
                         overall_emotion = match.group(1).strip()
