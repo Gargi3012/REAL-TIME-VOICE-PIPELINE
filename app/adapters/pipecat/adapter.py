@@ -159,13 +159,19 @@ def _build_real_pipeline_task(
         from pipecat.turns.user_stop.speech_timeout_user_turn_stop_strategy import SpeechTimeoutUserTurnStopStrategy
         from pipecat.processors.aggregators.llm_response_universal import LLMUserAggregatorParams
 
+        from app.llm.company_faq import get_faq_context_block
+
         session_id = bridge._session_id
         shared_state = {}
         
         system_content = VOICE_SYSTEM_PROMPT + "\n\n"
+        faq_block = get_faq_context_block()
+        if faq_block:
+            system_content += faq_block + "\n\n"
+            
         system_content += (
             "You have access to tools to save leads, fetch company knowledge, and end the call.\n"
-            "- Use 'fetch_faq' whenever the user asks about the company, products, pricing, or services.\n"
+            "- Use 'fetch_faq' ONLY if the user asks a specialized company detail that is NOT already present in the knowledge base above.\n"
             "- Use 'save_lead' when the user has provided their name, phone number, and project details.\n"
             "- Use 'end_call' ONLY when the user explicitly says goodbye or indicates they are done with the conversation (e.g. 'bye', 'call end kar do'). Do NOT use 'end_call' for simple acknowledgments like 'thank you', 'okay', or 'theek hai'.\n"
         )
@@ -269,6 +275,8 @@ def _build_real_pipeline_task(
             super().__init__()
             self.context = context
             self._current_llm_response = ""
+            self._seen_text_frame_ids = set()
+            self._llm_response_emitted_for_turn = False
             self._first_partial_logged = False
             self._first_llm_token_logged = False
             self._first_tts_chunk_logged = False
@@ -288,28 +296,34 @@ def _build_real_pipeline_task(
                 logger.info(f"[OBSERVABILITY] STT start | session_id={bridge._session_id} | component={source_class} | ts={now}")
                 self._stt_started_logged = True
             
-            # Accumulate LLM response text only when pushed directly from the LLM processor
-            if isinstance(frame, TextFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
-                if not self._first_llm_token_logged:
-                    logger.info(f"[OBSERVABILITY] First LLM token | session_id={bridge._session_id} | ts={now}")
-                    self._first_llm_token_logged = True
-                self._current_llm_response += frame.text
+            # Accumulate LLM response text ONLY from the LLM processor or universal aggregators (strictly ignore STT and TTS TextFrames)
+            if isinstance(frame, TextFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor", "LLMUserAggregator", "LLMAssistantAggregator"):
+                frame_id = id(frame)
+                if frame_id not in self._seen_text_frame_ids:
+                    self._seen_text_frame_ids.add(frame_id)
+                    if not self._first_llm_token_logged:
+                        logger.info(f"[OBSERVABILITY] First LLM token | session_id={bridge._session_id} | ts={now}")
+                        self._first_llm_token_logged = True
+                    self._current_llm_response += frame.text
             
             if isinstance(frame, UserStartedSpeakingFrame):
                 if latency_tracker:
                     latency_tracker.on_vad_start()
                 bridge.on_user_interrupted()
-                # Reset partial transcript tracker for new utterance
+                # Reset trackers for new turn
                 self._first_partial_logged = False
                 self._first_llm_token_logged = False
                 self._first_tts_chunk_logged = False
+                self._current_llm_response = ""
+                self._seen_text_frame_ids.clear()
+                self._llm_response_emitted_for_turn = False
                 
             elif isinstance(frame, UserStoppedSpeakingFrame):
                 if latency_tracker:
                     latency_tracker.on_vad_stop()
                 logger.info(f"[OBSERVABILITY] Final transcript (VAD Stop) | session_id={bridge._session_id} | ts={now}")
                 
-            # Emit transcript only when pushed directly from the STT processor
+            # Emit STT transcript only when pushed directly from STT processor
             elif isinstance(frame, TranscriptionFrame) and frame.text and source_class in ("DeepgramSTTService", "GroqSTTService", "OpenAISTTService", "ResilientSTTProcessor", "MockPipecatProcessor"):
                 if not self._first_partial_logged:
                     logger.info(f"[OBSERVABILITY] First partial transcript | session_id={bridge._session_id} | ts={now}")
@@ -317,25 +331,23 @@ def _build_real_pipeline_task(
                 
                 if latency_tracker:
                     latency_tracker.on_stt_transcript()
-                # Strip [System: ...] prompt engineering blocks to keep the UI and database history clean
                 import re
                 clean_text = re.sub(r'\s*\[System:.*?\]', '', frame.text, flags=re.DOTALL).strip()
                 bridge.on_transcript_ready(clean_text)
 
-            elif isinstance(frame, LLMFullResponseStartFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
+            elif isinstance(frame, LLMFullResponseStartFrame):
                 if latency_tracker:
                     latency_tracker.on_llm_first_token()
                 bridge.on_llm_response_started()
+                self._llm_response_emitted_for_turn = False
                     
-            elif isinstance(frame, LLMFullResponseEndFrame) and source_class in ("GroqLLMService", "OpenAILLMService", "ResilientLLMProcessor"):
+            elif isinstance(frame, LLMFullResponseEndFrame):
                 if latency_tracker:
                     latency_tracker.on_llm_complete()
-                
                 logger.info(f"[OBSERVABILITY] LLM completion | session_id={bridge._session_id} | ts={now}")
-                
-                # Emit LLM response complete only once
-                if self._current_llm_response:
-                    bridge.on_llm_response_ready(self._current_llm_response)
+                if not self._llm_response_emitted_for_turn and self._current_llm_response.strip():
+                    bridge.on_llm_response_ready(self._current_llm_response.strip())
+                    self._llm_response_emitted_for_turn = True
                     self._current_llm_response = ""
                 
             elif isinstance(frame, TTSStartedFrame):
@@ -345,6 +357,12 @@ def _build_real_pipeline_task(
                     logger.info(f"[OBSERVABILITY] First TTS chunk synthesized | session_id={bridge._session_id} | ts={now}")
                     self._first_tts_chunk_logged = True
                 bridge.on_audio_started()
+                
+                # Emit LLM text transcript to UI ONCE per turn as soon as speaker playback begins
+                if not self._llm_response_emitted_for_turn and self._current_llm_response.strip():
+                    bridge.on_llm_response_ready(self._current_llm_response.strip())
+                    self._llm_response_emitted_for_turn = True
+                    self._current_llm_response = ""
                 
             elif isinstance(frame, AudioRawFrame) and source_class in ("CartesiaTTSService", "ElevenLabsTTSService", "DeepgramTTSService") and not getattr(self, "_first_audio_packet_sent", False):
                 logger.info(f"[OBSERVABILITY] First audio packet sent (Transport bound) | session_id={bridge._session_id} | ts={now}")

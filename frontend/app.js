@@ -360,7 +360,7 @@ class VoicePipelineClient {
                 break;
             case 'tts_playing':
                 this.ui.setStatus('Bot speaking...', false, true);
-                this.ui.updateMetrics(data.total_latency_ms);
+                this.ui.updateMetrics(data.latency_ms || data.total_latency_ms);
                 break;
             case 'tts_complete':
                 this.ui.setStatus('Ready for input');
