@@ -25,9 +25,9 @@ It provides an orchestration framework capable of handling streaming audio and b
 - Pipecat Runtime
 - LiveKit Transport
 - Twilio Telephony Transport
-- Deepgram STT
-- Groq LLM
-- ElevenLabs / Cartesia TTS
+- Deepgram / Sarvam STT
+- Groq / OpenAI LLM
+- ElevenLabs / Cartesia / Sarvam TTS (including Shreya voice)
 
 *(Note: Prior WebRTC integrations such as Daily have been migrated exclusively to LiveKit).*
 
@@ -36,18 +36,20 @@ It provides an orchestration framework capable of handling streaming audio and b
 ```mermaid
 flowchart TD
     A[User] --> B[Transport]
-    B --> C[Deepgram STT]
+    B --> C[STT Service]
     C --> D[Conversation Pipeline]
     D --> E[LLM]
-    E --> F[TTS]
+    E --> F[TTS Service]
     F --> G[Audio Response]
 
     B_NOTE["LiveKit or Twilio"]
+    C_NOTE["Deepgram or Sarvam Saaras"]
     D_NOTE["Session → FSM → EventBus → Pipeline Runner"]
     E_NOTE["Groq or OpenAI or Gemini"]
-    F_NOTE["ElevenLabs or Cartesia"]
+    F_NOTE["ElevenLabs, Cartesia, or Sarvam Bulbul (Shreya voice)"]
 
     B --- B_NOTE
+    C --- C_NOTE
     D --- D_NOTE
     E --- E_NOTE
     F --- F_NOTE
@@ -65,15 +67,14 @@ flowchart TD
 | 🔌 **Provider Abstraction**           | Loose coupling between the orchestration layer and AI service providers.                                                                |
 | 🌐 **LiveKit Transport**              | Full WebRTC support for browser and client applications.                                                                                |
 | 📞 **Twilio Telephony**               | Production-ready inbound phone-call routing via WebSockets.                                                                             |
-| 📝 **Streaming STT**                  | Continuous, word-level speech transcription.                                                                                            |
-| 🔊 **Modular TTS**                    | Byte-streaming synthesized audio for responsive playback.                                                                               |
+| 📝 **Streaming STT**                  | Continuous, word-level speech transcription via Deepgram & Sarvam AI.                                                                   |
+| 🔊 **Modular TTS**                    | Byte-streaming synthesized audio playback via ElevenLabs, Cartesia, & Sarvam AI (Shreya voice).                                          |
 | 🧠 **Conversation Context**           | Maintains awareness across long-running conversations.                                                                                  |
 | 🧾 **Lead Capture & Tool Execution**  | AI dynamically collects user information and triggers backend actions such as `save_lead`.                                              |
-| 🌍 **Multilingual Support**           | Real-time conversations in English, Hindi, and Hinglish using Cartesia's `sonic-3.5` multilingual TTS model.                            |
+| 🌍 **Multilingual Support**           | Real-time conversations in English, Hindi, and Hinglish using Cartesia's `sonic-3.5` and Sarvam models.                                  |
 | ⏱️ **Latency Filler Control**         | Smart EventBus-driven cancellation of fillers such as "let me think" to prevent speaker overlap when the LLM responds or speech starts. |
 | 🏗️ **Clean Architecture**            | Strong separation of layers and dependency inversion for maintainability.                                                               |
 | ✅ **Strong Test Coverage**            | 430+ passing unit and integration tests.                                                                                                |
-
 
 ## 4. Repository Structure
 

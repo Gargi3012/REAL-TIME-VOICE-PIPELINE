@@ -237,10 +237,24 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any], transp
     )
 
     if role == ProcessorRole.STT:
-        if not DEEPGRAM_API_KEY:
-            raise ValueError("DEEPGRAM_API_KEY is not set in your .env file.")
+        from app.config import STT_PROVIDER, SARVAM_API_KEY
+        stt_provider = metadata.get("provider", STT_PROVIDER)
 
         sample_rate = 16000 if transport_type.lower() == "livekit" else 8000
+
+        if stt_provider == "sarvam":
+            from app.adapters.pipecat.sarvam_stt_service import SarvamSTTService
+            if not SARVAM_API_KEY:
+                raise ValueError("SARVAM_API_KEY is not set in your .env file.")
+            tts_stt = SarvamSTTService(
+                api_key=SARVAM_API_KEY,
+                sample_rate=sample_rate,
+            )
+            logger.info("SarvamSTTService created | model=saaras:v2")
+            return tts_stt
+
+        if not DEEPGRAM_API_KEY:
+            raise ValueError("DEEPGRAM_API_KEY is not set in your .env file.")
 
         # Call Pillar_2 STT factory
         pillar2_pipeline = _import_pillar2_module("pillar2_pipeline", "pipeline.py")
@@ -426,6 +440,24 @@ def _create_real_processor(role: ProcessorRole, metadata: dict[str, Any], transp
             tts._build_msg = custom_build_msg
 
             logger.info("CartesiaTTSService created | voice_id={v} | model=sonic-3.5 | language=hi (timestamps disabled)", v=voice_id)
+            return tts
+
+        elif provider == "sarvam":
+            from app.adapters.pipecat.sarvam_tts_service import SarvamTTSService
+            from app.config import SARVAM_API_KEY, SARVAM_TTS_VOICE, SARVAM_TTS_MODEL
+
+            if not SARVAM_API_KEY:
+                raise ValueError("SARVAM_API_KEY is not set in your .env file.")
+
+            voice = metadata.get("voice", metadata.get("voice_id", SARVAM_TTS_VOICE))
+            model = metadata.get("model", SARVAM_TTS_MODEL)
+            tts = SarvamTTSService(
+                api_key=SARVAM_API_KEY,
+                voice=voice,
+                model=model,
+                sample_rate=sample_rate,
+            )
+            logger.info(f"SarvamTTSService created | voice='{voice}' | model='{model}'")
             return tts
 
         else:
