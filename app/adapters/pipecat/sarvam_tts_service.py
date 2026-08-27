@@ -75,16 +75,16 @@ class SarvamTTSService(TTSService):
             }
             req_sample_rate = self.sample_rate if self.sample_rate in (8000, 16000, 22050) else 16000
 
-            for clause in clauses:
-                logger.info(f"SarvamTTSService: generating clause audio | voice='{self.voice}' | clause='{clause[:40]}...'")
-
+            # Helper async function to fetch audio for a single clause
+            async def fetch_clause_audio(clause_text: str):
+                logger.info(f"SarvamTTSService: generating clause audio | voice='{self.voice}' | clause='{clause_text[:40]}...'")
                 payload = {
-                    "inputs": [clause],
+                    "inputs": [clause_text],
                     "target_language_code": self.target_language_code,
                     "speaker": self.voice,
-                    "pace": 1.0,
+                    "pace": 1.08,
                     "speech_sample_rate": req_sample_rate,
-                    "enable_preprocessing": True,
+                    "enable_preprocessing": False,
                     "model": self.model,
                 }
                 if "v3" not in self.model.lower():
@@ -95,17 +95,20 @@ class SarvamTTSService(TTSService):
                     if resp.status != 200:
                         err_body = await resp.text()
                         logger.error(f"Sarvam AI TTS API error {resp.status}: {err_body}")
-                        yield ErrorFrame(error=f"Sarvam TTS API returned status {resp.status}")
-                        return
-
+                        return None
                     data = await resp.json()
                     audios = data.get("audios", [])
                     if not audios:
-                        logger.warning("Sarvam AI TTS returned empty audio list for clause.")
-                        continue
+                        return None
+                    return base64.b64decode(audios[0])
 
-                    audio_base64 = audios[0]
-                    audio_bytes = base64.b64decode(audio_base64)
+            # Launch async pre-fetch tasks for all clauses in parallel
+            fetch_tasks = [asyncio.create_task(fetch_clause_audio(c)) for c in clauses]
+
+            for task in fetch_tasks:
+                audio_bytes = await task
+                if not audio_bytes:
+                    continue
 
                 # Extract raw PCM bytes from WAV container
                 raw_pcm = audio_bytes
