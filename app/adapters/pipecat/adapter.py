@@ -201,7 +201,7 @@ def _build_real_pipeline_task(
         
         agg_params = LLMUserAggregatorParams(
             user_turn_strategies=UserTurnStrategies(
-                stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.8)]
+                stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.2)]
             )
         )
         user_agg = LLMUserAggregator(context, params=agg_params)
@@ -223,7 +223,7 @@ def _build_real_pipeline_task(
         ]
         filler_processor = LatencyFillerProcessor(
             filler_wav_paths=filler_wavs,
-            delay_threshold_ms=1000,
+            delay_threshold_ms=1500,
             event_bus=event_bus,
             session_id=session_id,
             shared_state=shared_state

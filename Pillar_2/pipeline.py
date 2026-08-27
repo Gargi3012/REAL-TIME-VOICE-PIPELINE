@@ -21,8 +21,8 @@ def build_vad_analyzer() -> SileroVADAnalyzer:
     return SileroVADAnalyzer(
         params=VADParams(
             confidence=0.7,
-            start_secs=0.15,    # 150ms sweet spot to filter transient noises
-            stop_secs=0.3,      # 300ms to allow brief natural pauses
+            start_secs=0.1,     # 100ms for fast speech start detection
+            stop_secs=0.2,      # 200ms recommended default for instant turn stopping
             min_volume=0.05,    # 5% threshold to block background hums
         )
     )
