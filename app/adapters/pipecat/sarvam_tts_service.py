@@ -35,6 +35,18 @@ class SarvamTTSService(TTSService):
         self.model = model
         self.target_language_code = target_language_code
         self.url = "https://api.sarvam.ai/text-to-speech"
+        self._session: Optional[aiohttp.ClientSession] = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(keepalive_timeout=60.0, limit=20, ttl_dns_cache=300)
+            self._session = aiohttp.ClientSession(connector=connector)
+        return self._session
+
+    async def stop(self, *args, **kwargs):
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
 
     def can_generate_metrics(self) -> bool:
         return True
@@ -73,23 +85,23 @@ class SarvamTTSService(TTSService):
                 payload["pitch"] = 0
                 payload["loudness"] = 1.5
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(self.url, headers=headers, json=payload, timeout=15) as resp:
-                    if resp.status != 200:
-                        err_body = await resp.text()
-                        logger.error(f"Sarvam AI TTS API error {resp.status}: {err_body}")
-                        yield ErrorFrame(error=f"Sarvam TTS API returned status {resp.status}")
-                        return
+            session = await self._get_session()
+            async with session.post(self.url, headers=headers, json=payload, timeout=15) as resp:
+                if resp.status != 200:
+                    err_body = await resp.text()
+                    logger.error(f"Sarvam AI TTS API error {resp.status}: {err_body}")
+                    yield ErrorFrame(error=f"Sarvam TTS API returned status {resp.status}")
+                    return
 
-                    data = await resp.json()
-                    audios = data.get("audios", [])
-                    if not audios:
-                        logger.warning("Sarvam AI TTS returned empty audio list.")
-                        yield TTSStoppedFrame()
-                        return
+                data = await resp.json()
+                audios = data.get("audios", [])
+                if not audios:
+                    logger.warning("Sarvam AI TTS returned empty audio list.")
+                    yield TTSStoppedFrame()
+                    return
 
-                    audio_base64 = audios[0]
-                    audio_bytes = base64.b64decode(audio_base64)
+                audio_base64 = audios[0]
+                audio_bytes = base64.b64decode(audio_base64)
 
             # Extract raw PCM bytes from WAV container
             raw_pcm = audio_bytes
