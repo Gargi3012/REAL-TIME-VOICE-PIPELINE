@@ -28,6 +28,7 @@ class UIManager {
         this.authUsername = document.getElementById('auth-username');
         this.authPassword = document.getElementById('auth-password');
         this.authToggleLink = document.getElementById('auth-toggle-link');
+        this.currentBotTurnMessage = null;
     }
 
     setTransportMode(mode) {
@@ -117,8 +118,27 @@ class UIManager {
             this.chatPlaceholder.style.display = 'none';
         }
 
+        // When user speaks, reset current turn Bot bubble reference
+        if (sender === 'You') {
+            this.currentBotTurnMessage = null;
+        }
+
+        // Update current turn's Bot response in-place if bubble already exists for this turn
+        if (sender === 'Bot' && this.currentBotTurnMessage && this.chatHistory.contains(this.currentBotTurnMessage)) {
+            const contentDiv = this.currentBotTurnMessage.querySelector('.message-content');
+            if (contentDiv) {
+                contentDiv.textContent = text;
+                this.chatHistory.scrollTop = this.chatHistory.scrollHeight;
+                return;
+            }
+        }
+
         const msgDiv = document.createElement('div');
         msgDiv.className = `message message-${sender === 'You' ? 'user' : 'bot'}`;
+        
+        if (sender === 'Bot') {
+            this.currentBotTurnMessage = msgDiv;
+        }
         
         const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
         let metaHtml = `<span>${time}</span>`;

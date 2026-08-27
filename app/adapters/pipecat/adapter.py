@@ -348,7 +348,6 @@ def _build_real_pipeline_task(
                 if not self._llm_response_emitted_for_turn and self._current_llm_response.strip():
                     bridge.on_llm_response_ready(self._current_llm_response.strip())
                     self._llm_response_emitted_for_turn = True
-                    self._current_llm_response = ""
                 
             elif isinstance(frame, TTSStartedFrame):
                 if latency_tracker:
@@ -357,12 +356,6 @@ def _build_real_pipeline_task(
                     logger.info(f"[OBSERVABILITY] First TTS chunk synthesized | session_id={bridge._session_id} | ts={now}")
                     self._first_tts_chunk_logged = True
                 bridge.on_audio_started()
-                
-                # Emit LLM text transcript to UI ONCE per turn as soon as speaker playback begins
-                if not self._llm_response_emitted_for_turn and self._current_llm_response.strip():
-                    bridge.on_llm_response_ready(self._current_llm_response.strip())
-                    self._llm_response_emitted_for_turn = True
-                    self._current_llm_response = ""
                 
             elif isinstance(frame, AudioRawFrame) and source_class in ("CartesiaTTSService", "ElevenLabsTTSService", "DeepgramTTSService") and not getattr(self, "_first_audio_packet_sent", False):
                 logger.info(f"[OBSERVABILITY] First audio packet sent (Transport bound) | session_id={bridge._session_id} | ts={now}")
