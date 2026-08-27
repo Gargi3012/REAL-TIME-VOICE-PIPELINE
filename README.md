@@ -17,9 +17,9 @@ It provides an orchestration framework capable of handling streaming audio and b
 - Pipecat Runtime
 - LiveKit Transport
 - Twilio Telephony Transport
-- Deepgram STT
-- Groq LLM
-- ElevenLabs / Cartesia TTS
+- Deepgram / Sarvam STT
+- Groq / OpenAI LLM
+- ElevenLabs / Cartesia / Sarvam TTS (including Shreya voice)
 
 *(Note: Prior WebRTC integrations such as Daily have been migrated exclusively to LiveKit).*
 
@@ -33,10 +33,11 @@ It provides an orchestration framework capable of handling streaming audio and b
  (LiveKit / Twilio)
          │
          ▼
-    Deepgram STT
+    STT Service
+(Deepgram / Sarvam Saaras)
          │
          ▼
- Conversation Pipeline
+  Conversation Pipeline
 (Session → FSM → EventBus → Pipeline Runner)
          │
          ▼
@@ -44,8 +45,8 @@ It provides an orchestration framework capable of handling streaming audio and b
 (Groq / OpenAI / Gemini)
          │
          ▼
-        TTS
-(ElevenLabs / Cartesia)
+    TTS Service
+(ElevenLabs / Cartesia / Sarvam Bulbul)
          │
          ▼
    Audio Response
@@ -61,8 +62,8 @@ It provides an orchestration framework capable of handling streaming audio and b
 - **Provider abstraction**: Loose coupling between orchestrator and AI services.
 - **LiveKit transport**: Full WebRTC support for browser/client clients.
 - **Twilio telephony**: Production-ready inbound phone call routing via WebSockets.
-- **Streaming STT**: Word-level continuous transcription.
-- **Modular TTS**: Byte-streaming synthesized audio playback.
+- **Streaming STT**: Word-level continuous transcription via Deepgram & Sarvam AI.
+- **Modular TTS**: Byte-streaming synthesized audio playback via ElevenLabs, Cartesia, & Sarvam AI (Shreya voice).
 - **Conversation context**: Long-running conversation awareness.
 - **Lead Capture & Tool Execution**: AI dynamically collects user details and triggers backend actions (`save_lead`).
 - **Multilingual Support**: Real-time conversation across English, Hindi, and Hinglish using Cartesia's `sonic-3.5` multilingual TTS model.
