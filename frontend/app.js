@@ -401,6 +401,13 @@ class VoicePipelineClient {
         this.ui.setConnectionState('connecting');
         this.ui.updateMetrics(0, '-', '-');
         try {
+            // Check for Secure Context / Microphone availability
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                    throw new Error('Microphone access is blocked by browser on insecure HTTP IP addresses. Please use HTTPS (SSL) or localhost.');
+                }
+            }
+
             // 1. Get Token from Backend
             const response = await fetch(`${this.API_BASE}/join`, { 
                 method: 'POST',
@@ -415,6 +422,17 @@ class VoicePipelineClient {
             if (!response.ok) throw new Error('Failed to fetch LiveKit token. Ensure backend is running.');
             const data = await response.json();
             
+            // Dynamic LiveKit Room URL fallback for AWS remote deployment
+            let roomUrl = data.roomUrl;
+            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                if (roomUrl.includes('localhost') || roomUrl.includes('127.0.0.1')) {
+                    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const port = roomUrl.split(':')[2] || '7880';
+                    roomUrl = `${wsProto}//${window.location.hostname}:${port}`;
+                    console.log('Dynamic AWS roomUrl rewrite:', roomUrl);
+                }
+            }
+
             // 2. Connect to LiveKit Room using CDN SDK
             this.room = new LivekitClient.Room();
             
@@ -424,11 +442,10 @@ class VoicePipelineClient {
                     const element = track.attach();
                     document.body.appendChild(element);
                     console.log("Audio element attached to body:", element);
-                    // Explicitly try to play to catch auto-play errors
                     if (element.play) {
                         element.play()
                             .then(() => console.log("Audio playing successfully!"))
-                            .catch(e => console.error("Autoplay blocked! Error:", e));
+                            .catch(e => console.warn("Autoplay notice:", e));
                     }
                 }
             });
@@ -437,9 +454,9 @@ class VoicePipelineClient {
                 this.ui.setConnectionState('disconnected');
             });
 
-            await this.room.connect(data.roomUrl, data.token);
+            await this.room.connect(roomUrl, data.token);
             
-            // Built-in LiveKit method to resume AudioContext (helps with browser autoplay policies)
+            // Built-in LiveKit method to resume AudioContext
             await this.room.startAudio().catch(e => console.warn("AudioContext error:", e));
             
             // 3. Enable local mic
@@ -449,7 +466,10 @@ class VoicePipelineClient {
 
         } catch (error) {
             console.error(error);
-            this.ui.showToast(error.message);
+            const errText = error.name === 'NotAllowedError' ? 
+                'Microphone permission denied. Please allow microphone access in browser settings.' : 
+                error.message;
+            this.ui.showToast(errText);
             this.ui.setConnectionState('disconnected');
         }
     }
