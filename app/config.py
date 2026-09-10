@@ -34,7 +34,7 @@ LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # "openai" | "groq"
 
 # ── Groq (LLM) ────────────────────────────────────────────────────────
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama3-8b-8192")
 GROQ_WHISPER_MODEL: str = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
 
 # ── OpenAI (LLM) ──────────────────────────────────────────────────────
@@ -46,8 +46,11 @@ ELEVEN_LABS_API_KEY: str = os.getenv("ELEVEN_LABS_API_KEY", "")
 ELEVEN_LABS_VOICE_ID: str = os.getenv("ELEVEN_LABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")
 ELEVENLABS_MODEL: str = os.getenv("ELEVENLABS_MODEL", "eleven_turbo_v2_5")
 
+# ── STT Provider Selection ─────────────────────────────────────────────
+STT_PROVIDER: str = os.getenv("STT_PROVIDER", "deepgram")  # "deepgram" | "sarvam"
+
 # ── TTS Provider Selection ─────────────────────────────────────────────
-TTS_PROVIDER: str = os.getenv("TTS_PROVIDER", "elevenlabs")  # "elevenlabs" | "deepgram" | "cartesia"
+TTS_PROVIDER: str = os.getenv("TTS_PROVIDER", "elevenlabs")  # "elevenlabs" | "deepgram" | "cartesia" | "sarvam"
 
 # ── Deepgram (also used for TTS, separate voice setting from STT) ─────
 DEEPGRAM_TTS_VOICE: str = os.getenv("DEEPGRAM_TTS_VOICE", "aura-2-asteria-en")
@@ -55,6 +58,11 @@ DEEPGRAM_TTS_VOICE: str = os.getenv("DEEPGRAM_TTS_VOICE", "aura-2-asteria-en")
 # ── Cartesia (Text-to-Speech) ──────────────────────────────────────────
 CARTESIA_API_KEY: str = os.getenv("CARTESIA_API_KEY", "")
 CARTESIA_VOICE_ID: str = os.getenv("CARTESIA_VOICE_ID", "a0e99841-438c-4a64-b679-ae501e7d6091")
+
+# ── Sarvam AI (STT & TTS) ──────────────────────────────────────────────
+SARVAM_API_KEY: str = os.getenv("SARVAM_API_KEY", "")
+SARVAM_TTS_VOICE: str = os.getenv("SARVAM_TTS_VOICE", "shreya")
+SARVAM_TTS_MODEL: str = os.getenv("SARVAM_TTS_MODEL", "bulbul:v3")
 
 # ── Bot identity ───────────────────────────────────────────────────────
 BOT_NAME: str = os.getenv("BOT_NAME", "Cybernauts Agent")

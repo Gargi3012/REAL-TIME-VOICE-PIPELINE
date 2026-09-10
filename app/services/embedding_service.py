@@ -1,26 +1,30 @@
 """
-Embedding service — wraps a local sentence-transformers model as a singleton
-so the (relatively heavy) model load happens once at process startup, not
-per-request. No external API calls, no GPT dependency, no network latency.
+Embedding service — wraps OpenAI's embedding API to generate 384-dim vectors.
+No heavy local model loading, saving gigabytes of disk space and memory.
 """
-from sentence_transformers import SentenceTransformer
+import os
+from openai import OpenAI
 from loguru import logger
 
-_model = None
+_client = None
 
 
-def get_embedding_model() -> SentenceTransformer:
-    """Lazily load and cache the embedding model (singleton)."""
-    global _model
-    if _model is None:
-        logger.info("Loading embedding model: all-MiniLM-L6-v2 ...")
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-        logger.info("Embedding model loaded.")
-    return _model
+def get_openai_client() -> OpenAI:
+    """Lazily initialize OpenAI client (singleton)."""
+    global _client
+    if _client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        _client = OpenAI(api_key=api_key)
+    return _client
 
 
 def embed_text(text: str) -> list[float]:
-    """Generate a 384-dim embedding vector for the given text."""
-    model = get_embedding_model()
-    vector = model.encode(text, normalize_embeddings=True)
-    return vector.tolist()
+    """Generate a 384-dim embedding vector for the given text using OpenAI API."""
+    logger.debug(f"Generating embedding for text: {text[:30]}...")
+    client = get_openai_client()
+    response = client.embeddings.create(
+        input=[text],
+        model="text-embedding-3-small",
+        dimensions=384
+    )
+    return response.data[0].embedding

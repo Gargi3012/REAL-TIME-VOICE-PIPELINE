@@ -28,6 +28,7 @@ class UIManager {
         this.authUsername = document.getElementById('auth-username');
         this.authPassword = document.getElementById('auth-password');
         this.authToggleLink = document.getElementById('auth-toggle-link');
+        this.currentBotTurnMessage = null;
     }
 
     setTransportMode(mode) {
@@ -117,8 +118,27 @@ class UIManager {
             this.chatPlaceholder.style.display = 'none';
         }
 
+        // When user speaks, reset current turn Bot bubble reference
+        if (sender === 'You') {
+            this.currentBotTurnMessage = null;
+        }
+
+        // Update current turn's Bot response in-place if bubble already exists for this turn
+        if (sender === 'Bot' && this.currentBotTurnMessage && this.chatHistory.contains(this.currentBotTurnMessage)) {
+            const contentDiv = this.currentBotTurnMessage.querySelector('.message-content');
+            if (contentDiv) {
+                contentDiv.textContent = text;
+                this.chatHistory.scrollTop = this.chatHistory.scrollHeight;
+                return;
+            }
+        }
+
         const msgDiv = document.createElement('div');
         msgDiv.className = `message message-${sender === 'You' ? 'user' : 'bot'}`;
+        
+        if (sender === 'Bot') {
+            this.currentBotTurnMessage = msgDiv;
+        }
         
         const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
         let metaHtml = `<span>${time}</span>`;
@@ -167,10 +187,15 @@ class VoicePipelineClient {
         this.ui = ui;
         this.ws = null;
         this.room = null;
-        this.API_BASE = '/api/livekit'; // Backend API (Relative path)
+        // Dynamic path prefix detection for sub-path reverse proxying (e.g. /voice)
+        const path = window.location.pathname;
+        const match = path.match(/(.*)\/frontend\//);
+        this.prefix = match ? match[1] : "";
+        
+        this.API_BASE = `${this.prefix}/api/livekit`; // Backend API (Dynamic)
         
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        this.WS_URL = `${wsProtocol}//${window.location.host}/ws/frontend`; // Backend WS (Dynamic)
+        this.WS_URL = `${wsProtocol}//${window.location.host}${this.prefix}/ws/frontend`; // Backend WS (Dynamic)
         
         // Auth token initialization
         this.token = localStorage.getItem('jwt_token') || '';
@@ -252,7 +277,7 @@ class VoicePipelineClient {
             return;
         }
 
-        const endpoint = this.isRegisterMode ? '/api/register' : '/api/login';
+        const endpoint = this.isRegisterMode ? `${this.prefix}/api/register` : `${this.prefix}/api/login`;
 
         try {
             const response = await fetch(endpoint, {
@@ -355,7 +380,7 @@ class VoicePipelineClient {
                 break;
             case 'tts_playing':
                 this.ui.setStatus('Bot speaking...', false, true);
-                this.ui.updateMetrics(data.total_latency_ms);
+                this.ui.updateMetrics(data.latency_ms || data.total_latency_ms);
                 break;
             case 'tts_complete':
                 this.ui.setStatus('Ready for input');
@@ -376,6 +401,13 @@ class VoicePipelineClient {
         this.ui.setConnectionState('connecting');
         this.ui.updateMetrics(0, '-', '-');
         try {
+            // Check for Secure Context / Microphone availability
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                    throw new Error('Microphone access is blocked by browser on insecure HTTP IP addresses. Please use HTTPS (SSL) or localhost.');
+                }
+            }
+
             // 1. Get Token from Backend
             const response = await fetch(`${this.API_BASE}/join`, { 
                 method: 'POST',
@@ -390,6 +422,17 @@ class VoicePipelineClient {
             if (!response.ok) throw new Error('Failed to fetch LiveKit token. Ensure backend is running.');
             const data = await response.json();
             
+            // Dynamic LiveKit Room URL fallback for AWS remote deployment
+            let roomUrl = data.roomUrl;
+            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                if (roomUrl.includes('localhost') || roomUrl.includes('127.0.0.1')) {
+                    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const port = roomUrl.split(':')[2] || '7880';
+                    roomUrl = `${wsProto}//${window.location.hostname}:${port}`;
+                    console.log('Dynamic AWS roomUrl rewrite:', roomUrl);
+                }
+            }
+
             // 2. Connect to LiveKit Room using CDN SDK
             this.room = new LivekitClient.Room();
             
@@ -399,11 +442,10 @@ class VoicePipelineClient {
                     const element = track.attach();
                     document.body.appendChild(element);
                     console.log("Audio element attached to body:", element);
-                    // Explicitly try to play to catch auto-play errors
                     if (element.play) {
                         element.play()
                             .then(() => console.log("Audio playing successfully!"))
-                            .catch(e => console.error("Autoplay blocked! Error:", e));
+                            .catch(e => console.warn("Autoplay notice:", e));
                     }
                 }
             });
@@ -412,9 +454,9 @@ class VoicePipelineClient {
                 this.ui.setConnectionState('disconnected');
             });
 
-            await this.room.connect(data.roomUrl, data.token);
+            await this.room.connect(roomUrl, data.token);
             
-            // Built-in LiveKit method to resume AudioContext (helps with browser autoplay policies)
+            // Built-in LiveKit method to resume AudioContext
             await this.room.startAudio().catch(e => console.warn("AudioContext error:", e));
             
             // 3. Enable local mic
@@ -424,7 +466,10 @@ class VoicePipelineClient {
 
         } catch (error) {
             console.error(error);
-            this.ui.showToast(error.message);
+            const errText = error.name === 'NotAllowedError' ? 
+                'Microphone permission denied. Please allow microphone access in browser settings.' : 
+                error.message;
+            this.ui.showToast(errText);
             this.ui.setConnectionState('disconnected');
         }
     }
@@ -450,7 +495,7 @@ class VoicePipelineClient {
         this.ui.updateMetrics(0, '-', '-');
 
         try {
-            const response = await fetch('/api/twilio/outbound', {
+            const response = await fetch(`${this.prefix}/api/twilio/outbound`, {
                 method: 'POST',
                 headers: this.getAuthHeaders(),
                 body: JSON.stringify({ phoneNumber: phoneNumber })

@@ -40,21 +40,16 @@ async def refresh_faq_cache() -> None:
             faqs = await FAQRepository.get_all(db)
 
         lines = [
-            f"COMPANY KNOWLEDGE BASE — {_COMPANY_NAME}",
-            "Use the following verified information to answer customer questions "
-            "about the company. If a caller asks something not covered here, "
-            "don't guess — instead say you don't have that specific detail, and "
-            "offer to take their Name and Phone number so the team can reach out to them.",
-            "",
+            f"COMPANY KNOWLEDGE BASE — {_COMPANY_NAME}:",
+            "Answer customer questions accurately using this verified information. If something is not covered, offer to take their Name and Phone number.",
         ]
 
         current_category = None
         for faq in faqs:
             if faq.category != current_category:
-                lines.append(f"## {faq.category}")
+                lines.append(f"[{faq.category}]")
                 current_category = faq.category
-            lines.append(f"Q: {faq.question}")
-            lines.append(f"A: {faq.answer}")
+            lines.append(f"- {faq.question} → {faq.answer}")
 
         _CACHED_CONTEXT_BLOCK = "\n".join(lines)
         logger.info("FAQ cache refreshed from database | entries={count}", count=len(faqs))

@@ -144,6 +144,8 @@ class PipecatEventBridge:
 
     def on_transcript_ready(self, text: str) -> None:
         """Called when Deepgram emits a final TranscriptionFrame."""
+        import time
+        self._turn_start_time = time.perf_counter()
         self._fsm_transition("TRANSCRIBING", reason="deepgram transcript received")
         self._bus.publish_sync(
             TranscriptReady(
@@ -186,12 +188,17 @@ class PipecatEventBridge:
 
     def on_audio_started(self) -> None:
         """Called when ElevenLabs begins streaming audio to the transport output."""
+        import time
+        latency_ms = 0
+        if hasattr(self, "_turn_start_time") and self._turn_start_time:
+            latency_ms = int((time.perf_counter() - self._turn_start_time) * 1000)
+
         if not self._greeting_complete:
             self._bus.publish_sync(AssistantGreetingTTSStarted(session_id=self._session_id))
             
         self._fsm_transition("SPEAKING", reason="TTS audio playback started")
         self._bus.publish_sync(
-            SpeakingStarted(session_id=self._session_id)
+            SpeakingStarted(session_id=self._session_id, payload={"latency_ms": latency_ms, "total_latency_ms": latency_ms})
         )
 
     def on_audio_finished(self) -> None:
