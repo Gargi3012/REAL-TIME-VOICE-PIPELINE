@@ -55,67 +55,51 @@ APP_STATE = {"is_ready": False}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize DB on startup to wake up Neon and pre-warm connection pool
+    # Initialize DB on startup with non-blocking 0.5s timeout
     logger.info("Initializing database connection pool...")
     from app.db.connection import db_manager
     try:
         db_manager.init_db()
-        # Retry mechanism for transient DB startup failures
-        import asyncio
-        for attempt in range(3):
-            try:
-                async with db_manager.get_session() as db:
-                    from sqlalchemy import text
-                    await db.execute(text("SELECT 1"))
-                break
-            except Exception as retry_err:
-                if attempt == 2:
-                    raise retry_err
-                await asyncio.sleep(1.0)
+        async def prewarm():
+            async with db_manager.get_session() as db:
+                from sqlalchemy import text
+                await db.execute(text("SELECT 1"))
+        await asyncio.wait_for(prewarm(), timeout=0.5)
         logger.info("Database connection pool initialized successfully.")
-        
-        # Ensure all database tables (including the new users table) are automatically created
-        try:
-            from app.db.base import Base
-            import app.db.models  # Registers all models (User, Client, etc.) to Base.metadata
+    except Exception as e:
+        logger.warning(f"Database pre-warm startup notice (degrading gracefully): {e}")
+
+    # Ensure all database tables exist
+    try:
+        from app.db.base import Base
+        import app.db.models
+        async def create_schemas():
             async with db_manager._engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
-            logger.info("Database schemas created/verified successfully.")
-        except Exception as schema_err:
-            logger.error(f"Failed to create database schemas: {schema_err}")
-        
-        # Seed default admin credentials in the database if table is empty
-        try:
-            from app.services.auth_service import seed_default_user_if_empty
+        await asyncio.wait_for(create_schemas(), timeout=0.5)
+    except Exception as schema_err:
+        logger.warning(f"Schema creation notice: {schema_err}")
+
+    # Seed default admin user
+    try:
+        from app.services.auth_service import seed_default_user_if_empty
+        async def seed():
             async with db_manager.get_session() as db:
                 await seed_default_user_if_empty(db)
-        except Exception as seed_err:
-            logger.error(f"Failed to seed default admin credentials: {seed_err}")
-    except Exception as e:
-        logger.error(f"Failed to initialize database on startup (will degrade gracefully): {e}")
-        # We do not crash the app so that we don't break the pipeline if DB is temporarily down.
+        await asyncio.wait_for(seed(), timeout=0.5)
+    except Exception:
+        pass
 
     # Pre-load FAQ context cache on startup
     try:
         from app.llm.company_faq import refresh_faq_cache
-        await refresh_faq_cache()
-        logger.info("FAQ cache refreshed successfully on startup.")
-    except Exception as faq_err:
-        logger.error(f"Failed to refresh FAQ cache on startup: {faq_err}")
+        await asyncio.wait_for(refresh_faq_cache(), timeout=0.5)
+    except Exception:
+        pass
 
-    # Ensure Qdrant vector DB collections exist (FAQ semantic search + pending FAQs)
-    try:
-        from app.services.vector_store import ensure_collections
-        ensure_collections()
-        logger.info("Qdrant vector store collections verified/created on startup.")
-    except Exception as vector_err:
-        logger.error(f"Failed to initialize Qdrant vector store (will degrade gracefully): {vector_err}")
-        
-    # Mark as ready regardless of DB to allow graceful degradation
+    # Mark as ready immediately so FastAPI serves requests instantly
     APP_STATE["is_ready"] = True
-    
-    from app.llm.company_faq import refresh_faq_cache
-    await refresh_faq_cache()
+    logger.info("FastAPI backend marked READY instantly.")
     
     async def stale_session_cleanup_task():
         import asyncio
@@ -145,6 +129,20 @@ async def lifespan(app: FastAPI):
     await db_manager.close()
 
 app = FastAPI(lifespan=lifespan, root_path=os.getenv("ROOT_PATH", ""))
+
+from fastapi.responses import FileResponse, RedirectResponse
+
+@app.get("/")
+def root_redirect():
+    return RedirectResponse(url="/frontend/index.html")
+
+@app.get("/voice/frontend/index.html")
+@app.get("/voice/frontend/")
+@app.get("/voice/frontend")
+@app.get("/voice")
+@app.get("/voice/")
+def serve_voice_frontend():
+    return FileResponse("frontend/index.html")
 
 @app.get("/health")
 def health_check():
@@ -819,6 +817,7 @@ async def run_voice_session(
 
 from fastapi.staticfiles import StaticFiles
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+app.mount("/voice/frontend", StaticFiles(directory="frontend"), name="voice_frontend")
 
 def main() -> None:
     """Synchronous entry point."""
