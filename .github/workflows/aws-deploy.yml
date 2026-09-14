@@ -52,7 +52,7 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
-        source: "."
+        source: "app,frontend,scratch,tests,Dockerfile,requirements.txt,locustfile.py,Pillar_2"
         target: "/home/ec2-user/REAL-TIME-VOICE-PIPELINE"
 
     - name: Run Deploy Script on EC2
@@ -61,6 +61,7 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
+        command_timeout: 30m
         script: |
           cd /home/ec2-user/REAL-TIME-VOICE-PIPELINE
           # Ensure .env file exists so docker run doesn't fail
