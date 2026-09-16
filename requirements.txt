@@ -6,7 +6,7 @@
 loguru==0.7.3
 
 # ── Pillar 2 — Real audio services ──
-pipecat-ai[livekit,silero,deepgram,elevenlabs,groq,openai,rnnoise]==1.5.0
+pipecat-ai[livekit,deepgram,elevenlabs,groq,openai,rnnoise]==1.5.0
 websockets==16.0
 fastapi==0.139.0
 uvicorn[standard]==0.50.1

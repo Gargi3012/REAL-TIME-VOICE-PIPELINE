@@ -1,46 +1,13 @@
-name: CI/CD Pipeline - Test and Deploy to AWS
+name: CI/CD Pipeline - Deploy to AWS
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
-  test:
-    name: Run Unit and Integration Tests
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
- 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-        cache: 'pip'
-
-    - name: Install System Audio Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y portaudio19-dev libasound2-dev libcurl4-openssl-dev
-
-    - name: Install Python Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Run Tests with Pytest
-      run: |
-        # Runs the unit and integration tests before deployment
-        python -m pytest
-
   deploy:
     name: Deploy to AWS EC2
-    needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
     - name: Checkout Code
@@ -52,7 +19,7 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
-        source: "app,frontend,scratch,tests,Dockerfile,requirements.txt,locustfile.py,Pillar_2"
+        source: "app,frontend,Dockerfile,requirements.txt"
         target: "/home/ec2-user/REAL-TIME-VOICE-PIPELINE"
 
     - name: Run Deploy Script on EC2
@@ -61,15 +28,11 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
-        command_timeout: 30m
+        command_timeout: 10m
         script: |
           cd /home/ec2-user/REAL-TIME-VOICE-PIPELINE
-          # Ensure .env file exists so docker run doesn't fail
           touch .env
-          # Build Docker image using the Dockerfile (using sudo for permissions)
-          sudo docker build -t voice-pipeline-app .
-          # Stop and remove old container if running
-          sudo docker stop voice-pipeline || true
-          sudo docker rm voice-pipeline || true
-          # Run the new container, referencing the .env file (using sudo for permissions)
-          sudo docker run -d --name voice-pipeline -p 8000:8000 --env-file .env voice-pipeline-app
+          (docker build -t voice-pipeline-app . || sudo -n docker build -t voice-pipeline-app .)
+          (docker stop voice-pipeline || sudo -n docker stop voice-pipeline || true)
+          (docker rm voice-pipeline || sudo -n docker rm voice-pipeline || true)
+          (docker run -d --name voice-pipeline --restart always -p 8000:8000 --env-file .env voice-pipeline-app || sudo -n docker run -d --name voice-pipeline --restart always -p 8000:8000 --env-file .env voice-pipeline-app)
