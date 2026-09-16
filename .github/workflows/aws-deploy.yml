@@ -52,7 +52,7 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
-        source: "."
+        source: "app,frontend,Dockerfile,requirements.txt"
         target: "/home/ec2-user/REAL-TIME-VOICE-PIPELINE"
 
     - name: Run Deploy Script on EC2
@@ -61,14 +61,11 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
+        command_timeout: 10m
         script: |
           cd /home/ec2-user/REAL-TIME-VOICE-PIPELINE
-          # Ensure .env file exists so docker run doesn't fail
           touch .env
-          # Build Docker image using the Dockerfile (using sudo for permissions)
-          sudo docker build -t voice-pipeline-app .
-          # Stop and remove old container if running
-          sudo docker stop voice-pipeline || true
-          sudo docker rm voice-pipeline || true
-          # Run the new container, referencing the .env file (using sudo for permissions)
-          sudo docker run -d --name voice-pipeline -p 8000:8000 --env-file .env voice-pipeline-app
+          (docker build -t voice-pipeline-app . || sudo -n docker build -t voice-pipeline-app .)
+          (docker stop voice-pipeline || sudo -n docker stop voice-pipeline || true)
+          (docker rm voice-pipeline || sudo -n docker rm voice-pipeline || true)
+          (docker run -d --name voice-pipeline --restart always -p 8000:8000 --env-file .env voice-pipeline-app || sudo -n docker run -d --name voice-pipeline --restart always -p 8000:8000 --env-file .env voice-pipeline-app)
